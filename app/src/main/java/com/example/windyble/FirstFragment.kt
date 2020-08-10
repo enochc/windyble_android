@@ -30,8 +30,6 @@ import kotlin.concurrent.fixedRateTimer
  */
 class FirstFragment : Fragment() {
 
-    lateinit var hiveConnection: HiveConnection
-//    val hiveConnection = ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
     val hives = mutableListOf<HiveViewModel>()
     var hiveAdapter:HiveAdapter? = null
 
@@ -45,6 +43,11 @@ class FirstFragment : Fragment() {
             inflater: LayoutInflater, container: ViewGroup?,
             savedInstanceState: Bundle?
     ): View? {
+
+
+        // TODO this currently only supports a single hive, to have multiple ie: more then one windyble
+        //  this will require modification
+
         // Inflate the layout for this fragment
         return inflater.inflate(R.layout.fragment_first, container, false)
     }
@@ -63,23 +66,34 @@ class FirstFragment : Fragment() {
             trans.commit()
         }
 
-        // TODO this currently only stupports a single hive, to have multiple ie: more then one windyble
-        //  this will require modification
-        hiveConnection = ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
+        val hiveConnection: HiveConnection =ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
+
+
 
         // Disconnect hive when activity is closed
         activity?.lifecycle?.addObserver(hiveConnection)
 //        lifecycle.addObserver(hiveConnection)
+        var is_connected = false
 
-        hiveConnection.connected.observe(viewLifecycleOwner, Observer {
+        hiveConnection.hive.connected.observe(viewLifecycleOwner, Observer {
             debug("CONNECTED !! $it")
             if(it) {
-                hives.add(hiveConnection.hive!!)
+                hives.add(hiveConnection.hive)
                 hiveAdapter?.notifyItemInserted(hiveAdapter!!.itemCount+1)
                 debug("Stuff: ${hiveAdapter?.itemCount}")
             } else {
-                hives.clear()
-                hiveAdapter?.notifyItemRemoved(0)
+                if(is_connected) {
+                    is_connected = false
+                    hives.clear()
+                    hiveAdapter?.notifyItemRemoved(0)
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("Connection Failed")
+                        .setMessage(hiveConnection.hive.errorString)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                        }
+                        .show()
+                }
+
             }
         })
 
@@ -88,7 +102,7 @@ class FirstFragment : Fragment() {
     override fun onResume() {
         super.onResume()
 
-        debug("Resume: is connected ${hiveConnection?.connected?.value}")
+
     }
 
 

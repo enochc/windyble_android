@@ -1,23 +1,19 @@
 package com.example.windyble.ui
 
-import androidx.lifecycle.ViewModelProviders
 import android.os.Bundle
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.SeekBar
+import android.widget.SeekBar.OnSeekBarChangeListener
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.windyble.R
 import com.example.windyble.debug
 import com.example.windyble.models.HiveConnection
 import kotlinx.android.synthetic.main.windyble_fragment.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import android.view.MotionEvent
-import android.view.View.OnTouchListener
 
 
 class WindybleFragment : Fragment() {
@@ -44,8 +40,22 @@ class WindybleFragment : Fragment() {
 
         speed_btn.setOnClickListener {
             val speed = speed.text.toString().toInt()
-            viewModel.hive?.updateProperty("speed", speed)
+            viewModel.hive.updateProperty("speed", speed)
         }
+        speed_seek.progress = 25
+        speed_seek.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+            override fun onProgressChanged(
+                seekBar: SeekBar,
+                progress: Int,
+                fromUser: Boolean
+            ) {}
+
+            override fun onStartTrackingTouch(seekBar: SeekBar) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar) {
+                println("POSITION: ${seekBar.progress}")
+                viewModel.hive.updateProperty("speed", seekBar.progress)
+            }
+        })
     }
 
     fun initButton(button:View){
@@ -55,18 +65,18 @@ class WindybleFragment : Fragment() {
                 button.isPressed = true
                 button.performClick()
                 if(isup){
-                    viewModel.hive?.updateProperty("moveup", true)
+                    viewModel.hive.updateProperty("moveup", true)
                 } else{
-                    viewModel.hive?.updateProperty("movedown", true)
+                    viewModel.hive.updateProperty("movedown", true)
                 }
 
 
             } else if(arg1.action == MotionEvent.ACTION_UP){
                 button.isPressed = false
                 if(isup){
-                    viewModel.hive?.updateProperty("moveup", false)
+                    viewModel.hive.updateProperty("moveup", false)
                 } else{
-                    viewModel.hive?.updateProperty("movedown", false)
+                    viewModel.hive.updateProperty("movedown", false)
                 }
             }
 
@@ -78,13 +88,13 @@ class WindybleFragment : Fragment() {
         super.onResume()
         activity?.findViewById<View>(R.id.fab)?.visibility = View.GONE
 
-        val speedval = viewModel.hive?.properties()?.first {
+        val speedval = viewModel.hive.properties()?.first {
             it.name == "speed"
-        }?.property?.value?.toString()
+        }.property.value?.toString()
         speed.setText(speedval)
 
 
-        viewModel.hive?.propertyReceived?.observe(viewLifecycleOwner, Observer {
+        viewModel.hive.propertyReceived.observe(viewLifecycleOwner, Observer {
             debug("<<<< <<< <<< GOT A PROPERTY: ${it.name}")
         })
 

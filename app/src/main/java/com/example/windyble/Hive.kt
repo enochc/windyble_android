@@ -65,7 +65,7 @@ const val TAG = "Hive <<"
 fun hveDebug(s: String) = Log.d(TAG, s)
 
 
-class Hive(val name: String = "Android client") {
+class Hive() {
 
     private var connection: Socket? = null
     var connected: Boolean = false
@@ -78,6 +78,8 @@ class Hive(val name: String = "Android client") {
 
     private val propertyChannel: Channel<PropType> = Channel()
     private val messageChanel: Channel<String> = Channel()
+
+    var errorString:String? = null
 
     fun disconnect() {
 
@@ -102,25 +104,28 @@ class Hive(val name: String = "Android client") {
 
     // TODO look at AsyncSocketChannel
     @ExperimentalUnsignedTypes
-    suspend fun connect(address: String, port: Int): Flow<PropType> {
-        if (!connected) {
+    suspend fun connect(address: String, port: Int, name:String="Android client"): Flow<PropType> {
+        if (!connected && port > 0) {
             try {
 
                 connection = Socket(address, port)
-                connected = true
                 writer = connection?.getOutputStream()
 
                 // send header with peer name then request peer updates
                 // TODO move request_peers into the header message
-                write("${HEADER}NAME=${this.name}")
+                write("${HEADER}NAME=${name}")
                 write(REQUEST_PEERS)
+                connected = true
             } catch (e: ConnectException) {
                 hveDebug("Error: $e")
+                errorString = e.message
                 connected = false
             }
+
+            hveDebug("Connected to server at $address on port $port")
         }
 
-        hveDebug("Connected to server at $address on port $port")
+
 
         // starts the messages consumer that needs to run in a coroutine scope to collect
         // messages over the socket

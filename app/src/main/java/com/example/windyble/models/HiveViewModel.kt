@@ -10,19 +10,34 @@ import kotlinx.coroutines.flow.collect
 class HiveViewModelFactory(private val name: String,
                            private val address:String,
                            private val port:Int) : ViewModelProvider.NewInstanceFactory() {
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T =
-        HiveViewModel(name, address, port) as T
+    override fun <T : ViewModel?> create(modelClass: Class<T>): T = HiveViewModel() as T
 }
 
 // default address is to host that emulator is running on
-class HiveViewModel(val hiveName: String = "Android Hive",
-                    private val hiveAddress:String="10.0.2.2",
-                    private val hivePort:Int =3000) {
-    private val hive = Hive(hiveName)
+class HiveViewModel() {
+    var hiveName:String=""
+    var hiveAddress:String=""
+    var hivePort:Int = 0
+
+    fun setConnectTo(hiveName: String = "Android Hive",
+//                    private val hiveAddress:String="10.0.2.2",
+                     hiveAddress:String="192.168.5.41",
+                     hivePort:Int =3000){
+
+        this.hiveName = hiveName
+        this.hiveAddress = hiveAddress
+        this.hivePort = hivePort
+    }
+    private val hive = Hive()
+
+    val errorString = hive.errorString
+
 
     fun properties():List<PropType> {
         return hive.currentProperties()
     }
+
+    var connected:MutableLiveData<Boolean> = MutableLiveData(false)
     var serverName:MutableLiveData<String> = MutableLiveData("")
 
     var propertyReceived: MutableLiveData<PropType> = MutableLiveData()
@@ -63,10 +78,24 @@ class HiveViewModel(val hiveName: String = "Android Hive",
                     }
                 }
 
+                hive.connectedChanged = {
+                    println("CONNECTION CHANGED: $it")
+                    launch {
+                        withContext(Dispatchers.Main) {
+                            println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  ${connected.value} || $it")
+                            if(!it.equals(connected.value)) {
+                                connected.value = it
+                            }
+                        }
+                    }
+                }
+
                 hive.connect(hiveAddress, hivePort).collect {
 
                     withContext(Dispatchers.Main) {
                         propertyReceived.value = it
+
+
                     }
                 }
             }
