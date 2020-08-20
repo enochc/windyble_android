@@ -21,7 +21,8 @@ class HiveViewModel() {
 
     fun setConnectTo(hiveName: String = "Android Hive",
 //                    private val hiveAddress:String="10.0.2.2",
-                     hiveAddress:String="192.168.5.41",
+//                     hiveAddress:String="192.168.5.41",
+                     hiveAddress:String="10.0.2.2",
                      hivePort:Int =3000){
 
         this.hiveName = hiveName

@@ -5,30 +5,21 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.FragmentTransaction
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
-import androidx.recyclerview.widget.ListAdapter
 
 import com.example.windyble.models.HiveConnection
 import com.example.windyble.models.HiveViewModel
 import com.example.windyble.ui.WindybleFragment
-import com.google.android.material.checkbox.MaterialCheckBox
-import com.google.android.material.textfield.TextInputEditText
-import kotlinx.android.synthetic.main.fragment_first.*
-import kotlin.concurrent.fixedRateTimer
+import kotlinx.android.synthetic.main.fragment_windy_list.*
 
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
  */
-class FirstFragment : Fragment() {
+class WindyListFragment : Fragment() {
 
     val hives = mutableListOf<HiveViewModel>()
     var hiveAdapter:HiveAdapter? = null
@@ -49,7 +40,7 @@ class FirstFragment : Fragment() {
         //  this will require modification
 
         // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_first, container, false)
+        return inflater.inflate(R.layout.fragment_windy_list, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -78,6 +69,7 @@ class FirstFragment : Fragment() {
         hiveConnection.hive.connected.observe(viewLifecycleOwner, Observer {
             debug("CONNECTED !! $it")
             if(it) {
+                is_connected = true
                 hives.add(hiveConnection.hive)
                 hiveAdapter?.notifyItemInserted(hiveAdapter!!.itemCount+1)
                 debug("Stuff: ${hiveAdapter?.itemCount}")

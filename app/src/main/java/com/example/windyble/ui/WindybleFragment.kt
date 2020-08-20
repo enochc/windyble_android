@@ -5,16 +5,31 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
+import android.widget.Spinner
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.windyble.R
 import com.example.windyble.debug
 import com.example.windyble.models.HiveConnection
+import com.example.windyble.models.HiveViewModel
 import kotlinx.android.synthetic.main.windyble_fragment.*
 
+class POTListener(val viewModel:HiveViewModel):AdapterView.OnItemSelectedListener {
+
+    override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
+       println("<<<<< Item Selected $pos, $id")
+        viewModel.updateProperty("pt", pos)
+    }
+
+    override fun onNothingSelected(parent: AdapterView<*>) {
+        println("<<<<< nothing selected")
+    }
+}
 
 class WindybleFragment : Fragment() {
 
@@ -38,10 +53,18 @@ class WindybleFragment : Fragment() {
         initButton(up_button)
         initButton(down_button)
 
-        speed_btn.setOnClickListener {
-            val speed = speed.text.toString().toInt()
-            viewModel.hive.updateProperty("speed", speed)
-        }
+        val pot_spinner:Spinner = pot_spinner
+        pot_spinner.adapter = ArrayAdapter.createFromResource(
+            requireContext(),
+            R.array.pot_values,
+            R.layout.pot_list_item
+        )
+        pot_spinner.onItemSelectedListener = POTListener(viewModel.hive)
+
+//        speed_btn.setOnClickListener {
+//            val speed = speed.text.toString().toInt()
+//            viewModel.hive.updateProperty("speed", speed)
+//        }
         speed_seek.progress = 25
         speed_seek.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             override fun onProgressChanged(
@@ -88,10 +111,12 @@ class WindybleFragment : Fragment() {
         super.onResume()
         activity?.findViewById<View>(R.id.fab)?.visibility = View.GONE
 
-        val speedval = viewModel.hive.properties()?.first {
-            it.name == "speed"
-        }.property.value?.toString()
-        speed.setText(speedval)
+//        val speed_prop = viewModel.hive.properties()
+
+//        val speedval = viewModel.hive.properties().first {
+//            it.name == "speed"
+//        }.property.value?.toString()
+//        speed.setText(speedval)
 
 
         viewModel.hive.propertyReceived.observe(viewLifecycleOwner, Observer {
