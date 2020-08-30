@@ -103,7 +103,6 @@ class Hive() {
     }
 
     // TODO look at AsyncSocketChannel
-    @ExperimentalUnsignedTypes
     suspend fun connect(address: String, port: Int, name:String="Android client"): Flow<PropType> {
         if (!connected && port > 0) {
             try {
@@ -156,7 +155,6 @@ class Hive() {
     }
 
 
-    @ExperimentalUnsignedTypes
     private fun messages(): Flow<String> {
         val inputStream = connection?.getInputStream()
 
@@ -252,7 +250,7 @@ class Hive() {
         write("$PEER_MESSAGE$peerName$PEER_MESSAGE_DIV$msg")
     }
 
-    @ExperimentalUnsignedTypes
+    @OptIn(kotlin.ExperimentalUnsignedTypes::class)
     private fun byteArrayToInt(vararg byte: Byte): Int {
         return (byte[0].toUByte().toInt().shl(24) +
                 byte[1].toUByte().toInt().shl(16) +

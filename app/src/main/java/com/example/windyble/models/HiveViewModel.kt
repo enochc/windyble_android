@@ -92,7 +92,7 @@ class HiveViewModel() {
                 }
 
                 hive.connect(hiveAddress, hivePort).collect {
-
+                    println(" <<< ............ Connecting hive $hiveAddress : $hivePort")
                     withContext(Dispatchers.Main) {
                         propertyReceived.value = it
 
