@@ -1,10 +1,7 @@
 package com.example.windyble.ui
 
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.MotionEvent
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.SeekBar
@@ -19,11 +16,18 @@ import com.example.windyble.models.HiveConnection
 import com.example.windyble.models.HiveViewModel
 import kotlinx.android.synthetic.main.windyble_fragment.*
 
-class POTListener(val viewModel:HiveViewModel):AdapterView.OnItemSelectedListener {
+
+class POTListener(val viewModel: HiveViewModel):AdapterView.OnItemSelectedListener {
+    var is_set = false
 
     override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
-       println("<<<<< Item Selected $pos, $id")
-        viewModel.updateProperty("pt", pos)
+        // this gets called once when the spinner is first initialized
+        if(is_set) {
+            println("<<<<< Item Selected $pos, $id")
+            viewModel.updateProperty("pt", pos)
+        } else {
+            is_set = true
+        }
     }
 
     override fun onNothingSelected(parent: AdapterView<*>) {
@@ -33,12 +37,17 @@ class POTListener(val viewModel:HiveViewModel):AdapterView.OnItemSelectedListene
 
 class WindybleFragment : Fragment() {
 
+    var reversed = false
     companion object {
         fun newInstance() = WindybleFragment()
     }
 
     private lateinit var viewModel: HiveConnection
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setHasOptionsMenu(true);
+    }
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -71,7 +80,8 @@ class WindybleFragment : Fragment() {
                 seekBar: SeekBar,
                 progress: Int,
                 fromUser: Boolean
-            ) {}
+            ) {
+            }
 
             override fun onStartTrackingTouch(seekBar: SeekBar) {}
             override fun onStopTrackingTouch(seekBar: SeekBar) {
@@ -81,32 +91,48 @@ class WindybleFragment : Fragment() {
         })
     }
 
-    fun initButton(button:View){
+    /*
+
+    STOPPED = 0,
+    GO= 1,
+    READY_UP = 2,
+    READY_DOWN = 3,
+
+     */
+    fun initButton(button: View){
         button.setOnTouchListener { arg0, arg1 ->
             val isup = arg0 == up_button
             if (arg1.action == MotionEvent.ACTION_DOWN) {
                 button.isPressed = true
                 button.performClick()
-                if(isup){
-                    viewModel.hive.updateProperty("moveup", true)
+                if((isup && !reversed) || (reversed && !isup)){
+//                if(isup){
+                    viewModel.hive.updateProperty("turn", 2)
                 } else{
-                    viewModel.hive.updateProperty("movedown", true)
+                    viewModel.hive.updateProperty("turn", 3)
                 }
 
 
             } else if(arg1.action == MotionEvent.ACTION_UP){
                 button.isPressed = false
-                if(isup){
-                    viewModel.hive.updateProperty("moveup", false)
-                } else{
-                    viewModel.hive.updateProperty("movedown", false)
-                }
+                viewModel.hive.updateProperty("turn", 0)
             }
 
             true
         }
     }
 
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        super.onPrepareOptionsMenu(menu)
+        val rev: MenuItem = menu.findItem(R.id.menu_reverse)
+        rev.isVisible = true
+        rev.isChecked = reversed
+        rev.setOnMenuItemClickListener {
+            it.setChecked(!it.isChecked)
+            reversed = !reversed
+            true
+        }
+    }
     override fun onResume() {
         super.onResume()
         activity?.findViewById<View>(R.id.fab)?.visibility = View.GONE

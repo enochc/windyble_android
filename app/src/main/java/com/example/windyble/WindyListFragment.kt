@@ -60,10 +60,6 @@ class WindyListFragment : Fragment() {
         val hiveConnection: HiveConnection =ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
 
 
-
-        // Disconnect hive when activity is closed
-        activity?.lifecycle?.addObserver(hiveConnection)
-//        lifecycle.addObserver(hiveConnection)
         var is_connected = false
 
         hiveConnection.hive.connected.observe(viewLifecycleOwner, Observer {
