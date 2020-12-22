@@ -1,12 +1,14 @@
 package com.example.windyble
 
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.Context
 import android.util.Log
 import com.moandjiezana.toml.Toml
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import java.io.OutputStream
 import java.net.ConnectException
@@ -102,7 +104,30 @@ class Hive() {
         }
     }
 
-    // TODO look at AsyncSocketChannel
+
+    suspend fun connect_bt(context: Context, address:String): Flow<PropType> {
+        val adapter = BluetoothAdapter.getDefaultAdapter();
+        //"B8:27:EB:1F:38:F0"
+        val device = adapter.getRemoteDevice(address);
+        val host = Host(adapter!!.name, adapter!!.address)
+        val gatt = HiveBluetoothGattCallback(host)
+        //todo mess with autoconnect
+        device.connectGatt(context, false, gatt, BluetoothDevice.TRANSPORT_LE)
+
+        GlobalScope.launch {
+            for (msg in gatt.messageChanel){
+                val str = msg.toString()
+                debug("<<< got message via message channel from gatt: $str")
+                process_msg(str)
+            }
+            //gatt.messageChanel
+        }
+
+        return properties()
+
+    }
+
+    // TODO look at c
     suspend fun connect(address: String, port: Int, name:String="Android client"): Flow<PropType> {
         if (!connected && port > 0) {
             try {
@@ -124,14 +149,10 @@ class Hive() {
             hveDebug("Connected to server at $address on port $port")
         }
 
-
-
         // starts the messages consumer that needs to run in a coroutine scope to collect
         // messages over the socket
         GlobalScope.launch {
-            messages().collect {
-                hveDebug("socket message: $it")
-            }
+            receive()
         }
 
         return properties()
@@ -154,77 +175,78 @@ class Hive() {
         }
     }
 
+    private suspend fun process_msg(message:String){
+        val msgType = message.substring(0, 3)
+        val msg = message.substring(3)
 
-    private fun messages(): Flow<String> {
-        val inputStream = connection?.getInputStream()
+        if (msgType == HEADER) {
+            //TODO maybe do something with this? the name of the server Hive
+            val name = msg.split("NAME=")[1]
+            hveDebug("HEADER NAME: $name")
+        } else if (msgType == DELETE) { // delete message
 
-        return flow {
-            while (connected) {
-                try {
-                    val bytes = ByteArray(4)
-                    inputStream?.read(bytes)
-                    val size = byteArrayToInt(*bytes)
-                    val msgBytes = ByteArray(size)
-                    inputStream?.read(msgBytes)
-
-                    var msg = msgBytes.toString(Charset.defaultCharset())
-                    if (msg.isEmpty()) {
-                        // no data received is usually a sign that the socket has been disconnected
-                        throw SocketException()
-                    }
-                    hveDebug("data received: $msg")
-
-                    val msgType = msg.substring(0, 3)
-                    msg = msg.substring(3)
-
-                    if (msgType == HEADER) {
-                        //TODO maybe do something with this? the name of the server Hive
-                        val name = msg.split("NAME=")[1]
-                        hveDebug("HEADER NAME: $name")
-                    } else if (msgType == DELETE) { // delete message
-
-                        for ((i, p) in _properties.withIndex()) {
-                            if (p.name == msg) {
-                                hveDebug("remove|| $msg")
-                                _properties.removeAt(i)
-                                val type = propertyToType(p.property.value)
-                                val prop = PropType(msg, Property(null), type, doRemove = i)
-                                propertyChannel.send(prop)
-                                break
-                            }
-                        }
-                    } else if (msgType == PROPERTY || msgType == PROPERTIES) {
-                        val toml = Toml().read(msg)
-                        for ((name, value) in toml.entrySet()) {
-                            val type = propertyToType(value)
-                            val prop = PropType(name, Property(value), type)
-                            propertyChannel.send(prop)
-                        }
-
-                        emit(msg)
-                    } else if (msgType == ACK) {
-                        hveDebug("ACK RECEIVED")
-                    } else if (msgType == REQUEST_PEERS) {
-                        hveDebug("<<<< RECEIVED PEERS $msg")
-                        _peers.clear()
-                        for (p in msg.split(",").iterator()) {
-                            val x = p.split("|")
-                            _peers.add(Peer(x[0], x[1]))
-                        }
-                        peersChanged?.invoke()
-                    } else if (msgType == PEER_MESSAGE) {
-                        hveDebug("Received Peer Message: $msg")
-                        messageChanel.send(msg)
-                    } else {
-                        Log.e(javaClass.name, "ERROR: unknown message: $msg")
-                    }
-
-
-                } catch (e: SocketException) {
-                    hveDebug("Socket Closed ")
-                    _properties.clear()
-                    connected = false
+            for ((i, p) in _properties.withIndex()) {
+                if (p.name == msg) {
+                    hveDebug("remove|| $msg")
+                    _properties.removeAt(i)
+                    val type = propertyToType(p.property.value)
+                    val prop = PropType(msg, Property(null), type, doRemove = i)
+                    propertyChannel.send(prop)
+                    break
                 }
+            }
+        } else if (msgType == PROPERTY || msgType == PROPERTIES) {
+            val toml = Toml().read(msg)
+            for ((name, value) in toml.entrySet()) {
+                val type = propertyToType(value)
+                val prop = PropType(name, Property(value), type)
+                propertyChannel.send(prop)
+            }
+
+//            emit(msg)
+        } else if (msgType == ACK) {
+            hveDebug("ACK RECEIVED")
+        } else if (msgType == REQUEST_PEERS) {
+            hveDebug("<<<< RECEIVED PEERS $msg")
+            _peers.clear()
+            for (p in msg.split(",").iterator()) {
+                val x = p.split("|")
+                _peers.add(Peer(x[0], x[1]))
+            }
+            peersChanged?.invoke()
+        } else if (msgType == PEER_MESSAGE) {
+            hveDebug("Received Peer Message: $msg")
+            messageChanel.send(msg)
+        } else {
+            Log.e(javaClass.name, "ERROR: unknown message: $msg")
+        }
+    }
+
+
+    private suspend fun receive() {
+        val inputStream = connection?.getInputStream()
+        while (connected) {
+            try {
+                val bytes = ByteArray(4)
+                inputStream?.read(bytes)
+                val size = byteArrayToInt(*bytes)
+                val msgBytes = ByteArray(size)
+                inputStream?.read(msgBytes)
+
+                var msg = msgBytes.toString(Charset.defaultCharset())
+                if (msg.isEmpty()) {
+                    // no data received is usually a sign that the socket has been disconnected
+                    throw SocketException()
+                }
+                hveDebug("data received: $msg")
+
+                process_msg(msg);
+
+
+            } catch (e: SocketException) {
+                hveDebug("Socket Closed ")
+                _properties.clear()
+                connected = false
             }
         }
     }
@@ -250,7 +272,8 @@ class Hive() {
         write("$PEER_MESSAGE$peerName$PEER_MESSAGE_DIV$msg")
     }
 
-    @OptIn(kotlin.ExperimentalUnsignedTypes::class)
+//    @OptIn(kotlin.ExperimentalUnsignedTypes::class)
+    @ExperimentalUnsignedTypes
     private fun byteArrayToInt(vararg byte: Byte): Int {
         return (byte[0].toUByte().toInt().shl(24) +
                 byte[1].toUByte().toInt().shl(16) +
@@ -262,6 +285,7 @@ class Hive() {
         val buffer = ByteBuffer.allocate(4)
         buffer.order(ByteOrder.BIG_ENDIAN) // BIG_ENDIAN is default byte order, so it is not necessary.
         buffer.putInt(value)
+
         return buffer.array()
     }
 
