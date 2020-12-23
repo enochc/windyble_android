@@ -17,6 +17,7 @@ import java.net.SocketException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
+import kotlin.concurrent.thread
 
 typealias Peer = Pair<String, String>
 
@@ -92,9 +93,10 @@ class Hive() {
     var connectedChanged: ((Boolean) -> Unit)? = null
     var peersChanged: (() -> Unit)? = null
 
-    fun onConnectedChanged(f: (Boolean) -> Unit) {
-        connectedChanged = f
-    }
+//    fun onConnectedChanged(f: (Boolean) -> Unit) {
+//        debug("<<<<< connected 2")
+//        connectedChanged = f
+//    }
 
     suspend fun peerMessages(): Flow<String> {
         return flow {
@@ -105,22 +107,29 @@ class Hive() {
     }
 
 
-    suspend fun connect_bt(context: Context, address:String): Flow<PropType> {
+    fun connect_bt(context: Context, address:String): Flow<PropType> {
         val adapter = BluetoothAdapter.getDefaultAdapter();
         //"B8:27:EB:1F:38:F0"
         val device = adapter.getRemoteDevice(address);
         val host = Host(adapter!!.name, adapter!!.address)
         val gatt = HiveBluetoothGattCallback(host)
+        gatt.onConnectedChanged {
+            debug("<<<<< connected 1 $it")
+            connected = it
+        }
+
         //todo mess with autoconnect
         device.connectGatt(context, false, gatt, BluetoothDevice.TRANSPORT_LE)
 
         GlobalScope.launch {
             for (msg in gatt.messageChanel){
-                val str = msg.toString()
+                val str = String(msg)//msg.toString()
                 debug("<<< got message via message channel from gatt: $str")
-                process_msg(str)
+                runBlocking {
+                    process_msg(str)
+                }
+
             }
-            //gatt.messageChanel
         }
 
         return properties()
@@ -155,12 +164,13 @@ class Hive() {
             receive()
         }
 
+
         return properties()
     }
 
     // this reads from the channel
     @ExperimentalCoroutinesApi
-    private suspend fun properties(): Flow<PropType> {
+    private fun properties(): Flow<PropType> {
         return flow {
             for (p in _properties) {
                 emit(p)
@@ -182,7 +192,7 @@ class Hive() {
         if (msgType == HEADER) {
             //TODO maybe do something with this? the name of the server Hive
             val name = msg.split("NAME=")[1]
-            hveDebug("HEADER NAME: $name")
+            debug("HEADER NAME: $name")
         } else if (msgType == DELETE) { // delete message
 
             for ((i, p) in _properties.withIndex()) {
@@ -197,17 +207,22 @@ class Hive() {
             }
         } else if (msgType == PROPERTY || msgType == PROPERTIES) {
             val toml = Toml().read(msg)
-            for ((name, value) in toml.entrySet()) {
+            val es = toml.entrySet()
+            debug("process properties: ${es.size}")
+            for ((name, value) in es) {
+                debug("process:: $name, $value")
                 val type = propertyToType(value)
                 val prop = PropType(name, Property(value), type)
                 propertyChannel.send(prop)
+
             }
+            debug("processed");
 
 //            emit(msg)
         } else if (msgType == ACK) {
-            hveDebug("ACK RECEIVED")
+            debug("ACK RECEIVED")
         } else if (msgType == REQUEST_PEERS) {
-            hveDebug("<<<< RECEIVED PEERS $msg")
+            debug("<<<< RECEIVED PEERS $msg")
             _peers.clear()
             for (p in msg.split(",").iterator()) {
                 val x = p.split("|")
@@ -215,7 +230,7 @@ class Hive() {
             }
             peersChanged?.invoke()
         } else if (msgType == PEER_MESSAGE) {
-            hveDebug("Received Peer Message: $msg")
+            debug("Received Peer Message: $msg")
             messageChanel.send(msg)
         } else {
             Log.e(javaClass.name, "ERROR: unknown message: $msg")
@@ -238,13 +253,13 @@ class Hive() {
                     // no data received is usually a sign that the socket has been disconnected
                     throw SocketException()
                 }
-                hveDebug("data received: $msg")
+                debug("data received: $msg")
 
                 process_msg(msg);
 
 
             } catch (e: SocketException) {
-                hveDebug("Socket Closed ")
+                debug("Socket Closed ")
                 _properties.clear()
                 connected = false
             }
@@ -258,11 +273,11 @@ class Hive() {
                 withContext(Dispatchers.IO) {
                     val msgByts = (message).toByteArray(Charset.defaultCharset())
                     val sBytes = intToByteArray(msgByts.size)
-                    hveDebug("<<<< writing: $message")
+                    debug("<<<< writing: $message")
                     writer?.write(sBytes)
                     writer?.write(msgByts)
                     writer?.flush()
-                    hveDebug("written")
+                    debug("written")
                 }
             }
         }

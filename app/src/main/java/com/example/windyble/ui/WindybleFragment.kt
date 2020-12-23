@@ -12,26 +12,26 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.example.windyble.R
 import com.example.windyble.debug
-import com.example.windyble.models.HiveConnection
-import com.example.windyble.models.HiveViewModel
+import com.example.windyble.HiveConnection
+import com.example.windyble.HiveWraper
 import kotlinx.android.synthetic.main.windyble_fragment.*
 
 
-class POTListener(val viewModel: HiveViewModel):AdapterView.OnItemSelectedListener {
+class POTListener(val wraper: HiveWraper):AdapterView.OnItemSelectedListener {
     var is_set = false
 
     override fun onItemSelected(parent: AdapterView<*>, view: View?, pos: Int, id: Long) {
         // this gets called once when the spinner is first initialized
         if(is_set) {
-            println("<<<<< Item Selected $pos, $id")
-            viewModel.updateProperty("pt", pos)
+            debug("<<<<< Item Selected $pos, $id")
+            wraper.updateProperty("pt", pos)
         } else {
             is_set = true
         }
     }
 
     override fun onNothingSelected(parent: AdapterView<*>) {
-        println("<<<<< nothing selected")
+        debug("<<<<< nothing selected")
     }
 }
 
@@ -42,7 +42,7 @@ class WindybleFragment : Fragment() {
         fun newInstance() = WindybleFragment()
     }
 
-    private lateinit var viewModel: HiveConnection
+    private lateinit var hiveConnection: HiveConnection
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,7 +57,7 @@ class WindybleFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        viewModel = ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
+        hiveConnection = ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
 
         initButton(up_button)
         initButton(down_button)
@@ -68,7 +68,7 @@ class WindybleFragment : Fragment() {
             R.array.pot_values,
             R.layout.pot_list_item
         )
-        pot_spinner.onItemSelectedListener = POTListener(viewModel.hive)
+        pot_spinner.onItemSelectedListener = POTListener(hiveConnection.hiveWraper)
 
 //        speed_btn.setOnClickListener {
 //            val speed = speed.text.toString().toInt()
@@ -85,8 +85,8 @@ class WindybleFragment : Fragment() {
 
             override fun onStartTrackingTouch(seekBar: SeekBar) {}
             override fun onStopTrackingTouch(seekBar: SeekBar) {
-                println("POSITION: ${seekBar.progress}")
-                viewModel.hive.updateProperty("speed", seekBar.progress)
+                debug("POSITION: ${seekBar.progress}")
+                hiveConnection.hiveWraper.updateProperty("speed", seekBar.progress)
             }
         })
     }
@@ -107,15 +107,15 @@ class WindybleFragment : Fragment() {
                 button.performClick()
                 if((isup && !reversed) || (reversed && !isup)){
 //                if(isup){
-                    viewModel.hive.updateProperty("turn", 2)
+                    hiveConnection.hiveWraper.updateProperty("turn", 2)
                 } else{
-                    viewModel.hive.updateProperty("turn", 3)
+                    hiveConnection.hiveWraper.updateProperty("turn", 3)
                 }
 
 
             } else if(arg1.action == MotionEvent.ACTION_UP){
                 button.isPressed = false
-                viewModel.hive.updateProperty("turn", 0)
+                hiveConnection.hiveWraper.updateProperty("turn", 0)
             }
 
             true
@@ -145,7 +145,7 @@ class WindybleFragment : Fragment() {
 //        speed.setText(speedval)
 
 
-        viewModel.hive.propertyReceived.observe(viewLifecycleOwner, Observer {
+        hiveConnection.hiveWraper.propertyReceived.observe(viewLifecycleOwner, Observer {
             debug("<<<< <<< <<< GOT A PROPERTY: ${it.name}")
         })
 

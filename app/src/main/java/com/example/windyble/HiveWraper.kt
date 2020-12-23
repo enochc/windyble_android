@@ -1,23 +1,14 @@
-package com.example.windyble.models
+package com.example.windyble
 
 import android.content.Context
-import android.util.Log
 import androidx.lifecycle.*
-import com.example.windyble.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 
 
-class HiveViewModelFactory(
-    private val name: String,
-    private val address: String,
-    private val port: Int
-) : ViewModelProvider.NewInstanceFactory() {
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T = HiveViewModel() as T
-}
 
 // default address is to host that emulator is running on
-class HiveViewModel() {
+class HiveWraper() {
     var hiveName: String? = null
     var hiveAddress: String? = null
     var hivePort: Int = 0
@@ -47,7 +38,7 @@ class HiveViewModel() {
         return hive.currentProperties()
     }
 
-    var connected: MutableLiveData<Boolean> = MutableLiveData(false)
+    val connected: MutableLiveData<Boolean> = MutableLiveData(false)
     var serverName: MutableLiveData<String> = MutableLiveData("")
 
     var propertyReceived: MutableLiveData<PropType> = MutableLiveData()
@@ -89,11 +80,10 @@ class HiveViewModel() {
                 }
 
                 hive.connectedChanged = {
-                    println("CONNECTION CHANGED: $it")
-                    launch {
-                        withContext(Dispatchers.Main) {
-                            println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  ${connected.value} || $it")
-                            if (!it.equals(connected.value)) {
+                    if (!it.equals(connected.value)) {
+                        GlobalScope.launch {
+                            withContext(Dispatchers.Main) {
+                                debug("<<<<<<<<<<<<<<<<  ${connected.value} || $it")
                                 connected.value = it
                             }
                         }
@@ -101,12 +91,17 @@ class HiveViewModel() {
                 }
                 if(!btAddress.isNullOrEmpty()){
                     // connect to bt address
-                    hive.connect_bt(context, btAddress!!)
+                    hive.connect_bt(context, btAddress!!).collect {
+                        //debug("<<<< received $it")
+                        withContext(Dispatchers.Main) {
+                            propertyReceived.value = it
+                        }
+                    }
                 }
                 if(!hiveAddress.isNullOrEmpty()){
                     hive.connect(hiveAddress!!, hivePort).collect {
 
-                        println(" <<< ............ Connecting hive $hiveAddress : $hivePort")
+                        debug(" <<< ............ Connecting hive $hiveAddress : $hivePort")
                         withContext(Dispatchers.Main) {
                             propertyReceived.value = it
 

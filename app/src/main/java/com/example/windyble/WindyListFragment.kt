@@ -10,8 +10,6 @@ import androidx.fragment.app.FragmentTransaction
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 
-import com.example.windyble.models.HiveConnection
-import com.example.windyble.models.HiveViewModel
 import com.example.windyble.ui.WindybleFragment
 import kotlinx.android.synthetic.main.fragment_windy_list.*
 
@@ -21,7 +19,7 @@ import kotlinx.android.synthetic.main.fragment_windy_list.*
  */
 class WindyListFragment : Fragment() {
 
-    val hives = mutableListOf<HiveViewModel>()
+    val hives = mutableListOf<HiveWraper>()
     var hiveAdapter:HiveAdapter? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,16 +55,16 @@ class WindyListFragment : Fragment() {
             trans.commit()
         }
 
-        val hiveConnection: HiveConnection =ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
+        val hiveConnection: HiveConnection = ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
 
 
         var is_connected = false
 
-        hiveConnection.hive.connected.observe(viewLifecycleOwner, Observer {
-            debug("CONNECTED !! $it")
+        hiveConnection.hiveWraper.connected.observe(viewLifecycleOwner, Observer {
+            debug("CONNECTED !! <<< <<< <<<< <<< <<<<<<<<<<<<<<<<<<<<<<<  $it")
             if(it) {
                 is_connected = true
-                hives.add(hiveConnection.hive)
+                hives.add(hiveConnection.hiveWraper)
                 hiveAdapter?.notifyItemInserted(hiveAdapter!!.itemCount+1)
                 debug("Stuff: ${hiveAdapter?.itemCount}")
             } else {
@@ -76,7 +74,7 @@ class WindyListFragment : Fragment() {
                     hiveAdapter?.notifyItemRemoved(0)
                     AlertDialog.Builder(requireContext())
                         .setTitle("Connection Failed")
-                        .setMessage(hiveConnection.hive.errorString)
+                        .setMessage(hiveConnection.hiveWraper.errorString)
                         .setPositiveButton(android.R.string.ok) { _, _ ->
                         }
                         .show()

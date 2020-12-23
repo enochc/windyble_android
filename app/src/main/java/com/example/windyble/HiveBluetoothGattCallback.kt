@@ -2,8 +2,10 @@ package com.example.windyble
 
 import android.bluetooth.*
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*
@@ -12,19 +14,46 @@ import java.util.*
 data class Host(val name: String, val address: String)
 
 class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
+
+    companion object {
+        var notifyDescriptor:BluetoothGattDescriptor? = null
+        var myGatt:BluetoothGatt? = null
+
+        fun unsubscribe(){
+            debug("try unsubscribe")
+            notifyDescriptor?.let {
+                it.value = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+                myGatt?.writeDescriptor(it)?.let {worked ->
+                    if(worked){debug("UNSUBSCRIBED")}else{
+                        debug("Failed to unsubscribe")
+                    }
+                }
+            }
+        }
+    }
     var wait = false
     var on_subscribed:(()->Unit)? = null
 
     val messageChanel: Channel<ByteArray> = Channel()
 
+    var connectedChanged: ((Boolean) -> Unit)? = null
+    fun onConnectedChanged(f: (Boolean) -> Unit) {
+        debug("<<<<< connected 0")
+        connectedChanged = f
+    }
+
+
+
     override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
         super.onConnectionStateChange(gatt, status, newState)
         when(newState){
             BluetoothProfile.STATE_DISCONNECTED -> {
+                connectedChanged?.invoke(false)
                 debug("DISCONNECTED")
             }
             BluetoothProfile.STATE_CONNECTED -> {
                 debug("CONNECTED!!")
+                connectedChanged?.invoke(true)
                 gatt?.discoverServices()
             }
             else -> {
@@ -34,6 +63,8 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
         debug("onConnectionStateChange $status, $newState")
 
     }
+
+
 
     override fun onCharacteristicWrite(
         gatt: BluetoothGatt?,
@@ -51,9 +82,10 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
         // This is where character subscribe notifications come in
         super.onCharacteristicChanged(gatt, characteristic)
 
-        debug("<< onCharacteristicChanged::: ${characteristic?.value}")
+//        val ss = String(characteristic?.value!!)
+//        debug("received message: $ss")
 
-        GlobalScope.launch {
+        runBlocking {
             characteristic?.value?.let { messageChanel.send(it) }
         }
 
@@ -97,9 +129,10 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
                         val mine = char.uuid.toString().startsWith("00001235")
                         debug("char: ${char.uuid}, mine: $mine")
                         if (mine) {
+                            gatt.setCharacteristicNotification(char, true)
                             on_subscribed = {
                                 // This is the connect byte sequence
-                                val s = 0x9876.toShort()
+                                val s = 0x9876.toShort() // Send connect bites
                                 val buffer = ByteBuffer.allocate(2)
                                 buffer.putShort(s)
                                 val ssss = "${host.address},${host.name}".encodeToByteArray()
@@ -107,17 +140,17 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
 
                                 if (gatt.writeCharacteristic(char)){
                                     debug("did a thing")
-                                    if(gatt.setCharacteristicNotification(char, true)){
-                                        for (desc in char.descriptors){
+//                                    if(gatt.setCharacteristicNotification(char, true)){
+//                                        for (desc in char.descriptors){
+//
+//                                            if (desc.uuid.toString().startsWith("00001236")) {
+//                                                debug("Desk: ${desc.uuid}, ${desc.value}")
+//
+//                                            }
+//                                        }
+//                                    }
 
-                                            if (desc.uuid.toString().startsWith("00001236")) {
-                                                debug("Desk: ${desc.uuid}, ${desc.value}")
-
-                                            }
-                                        }
-                                    }
-
-                                    debug("did another thing")
+//                                    debug("did another thing")
                                 } else {
                                     debug("character write failed")
                                 }
@@ -126,6 +159,8 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
                             val cccd = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
                             for (desc in char.descriptors) {
                                 if(cccd.equals(desc.uuid)){
+                                    notifyDescriptor = desc
+                                    myGatt = gatt
                                     desc.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                                     if (gatt.writeDescriptor(desc)) {
                                         wait = true

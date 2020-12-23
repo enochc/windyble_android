@@ -1,19 +1,15 @@
 package com.example.windyble
 
-import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.lifecycle.Observer
-import androidx.lifecycle.observe
 
 import androidx.recyclerview.widget.RecyclerView
-import com.example.windyble.models.HiveViewModel
 import kotlinx.android.synthetic.main.hive_list_item.view.*
 
-class HiveAdapter(val hives:List<HiveViewModel>): RecyclerView.Adapter<HiveAdapter.ViewHolder>() {
+class HiveAdapter(val hives:List<HiveWraper>): RecyclerView.Adapter<HiveAdapter.ViewHolder>() {
 
-    var hiveClicked: ((HiveViewModel)->Unit)? = null
+    var hiveClicked: ((HiveWraper)->Unit)? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): HiveAdapter.ViewHolder {
         val view = LayoutInflater.from(parent.context)
