@@ -77,6 +77,7 @@ class Hive() {
             connectedChanged?.invoke(field)
         }
 
+    private var hiveGatt:HiveBluetoothGattCallback? = null
     private var writer: OutputStream? = null
 
     private val propertyChannel: Channel<PropType> = Channel()
@@ -117,6 +118,7 @@ class Hive() {
             debug("<<<<< connected 1 $it")
             connected = it
         }
+        this.hiveGatt = gatt
 
         //todo mess with autoconnect
         device.connectGatt(context, false, gatt, BluetoothDevice.TRANSPORT_LE)
@@ -269,15 +271,19 @@ class Hive() {
 
     private fun write(message: String) {
         if (connected) {
-            runBlocking {
-                withContext(Dispatchers.IO) {
-                    val msgByts = (message).toByteArray(Charset.defaultCharset())
-                    val sBytes = intToByteArray(msgByts.size)
-                    debug("<<<< writing: $message")
-                    writer?.write(sBytes)
-                    writer?.write(msgByts)
-                    writer?.flush()
-                    debug("written")
+            if (this.hiveGatt != null){
+                this.hiveGatt?.writeProperty(message.toByteArray())
+            } else {
+                runBlocking {
+                    withContext(Dispatchers.IO) {
+                        val msgByts = (message).toByteArray(Charset.defaultCharset())
+                        val sBytes = intToByteArray(msgByts.size)
+                        debug("<<<< writing: $message")
+                        writer?.write(sBytes)
+                        writer?.write(msgByts)
+                        writer?.flush()
+                        debug("written")
+                    }
                 }
             }
         }

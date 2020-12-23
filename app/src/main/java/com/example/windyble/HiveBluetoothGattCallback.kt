@@ -31,6 +31,13 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
             }
         }
     }
+    var writeDescriptor:BluetoothGattDescriptor? = null
+
+    fun writeProperty(msg:ByteArray){
+        writeDescriptor?.value = msg
+        myGatt?.writeDescriptor(writeDescriptor)
+    }
+
     var wait = false
     var on_subscribed:(()->Unit)? = null
 
@@ -82,9 +89,8 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
         // This is where character subscribe notifications come in
         super.onCharacteristicChanged(gatt, characteristic)
 
-//        val ss = String(characteristic?.value!!)
-//        debug("received message: $ss")
-
+        // This does not run in the GlobalScope, the characteristic value
+        // can get overwritten before the value is sent if changes occure very fast.
         runBlocking {
             characteristic?.value?.let { messageChanel.send(it) }
         }
@@ -140,17 +146,15 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
 
                                 if (gatt.writeCharacteristic(char)){
                                     debug("did a thing")
-//                                    if(gatt.setCharacteristicNotification(char, true)){
-//                                        for (desc in char.descriptors){
-//
-//                                            if (desc.uuid.toString().startsWith("00001236")) {
-//                                                debug("Desk: ${desc.uuid}, ${desc.value}")
-//
-//                                            }
-//                                        }
-//                                    }
 
-//                                    debug("did another thing")
+                                    for (desc in char.descriptors){
+                                        if (desc.uuid.toString().startsWith("00001236")) {
+                                            writeDescriptor = desc
+                                            debug("Desk: ${desc.uuid}, ${desc.value}")
+
+                                        }
+                                    }
+
                                 } else {
                                     debug("character write failed")
                                 }
