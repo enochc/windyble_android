@@ -143,11 +143,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun get_uuid(): UUID{
-        var uuid:String? = null
-        uuid = addrPrefs.getString("MY_BT_UUID", null)
+        var uuid:String? = addrPrefs.getString("MY_BT_UUID", null)
         if (uuid.isNullOrBlank()){
             uuid = UUID.randomUUID().toString()
-            addrPrefs.edit().putString("MY_BT_UUID", uuid.toString())
+            addrPrefs.edit().putString("MY_BT_UUID", uuid.toString()).apply()
         }
         return UUID.fromString(uuid)
     }
