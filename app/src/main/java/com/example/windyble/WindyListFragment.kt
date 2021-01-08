@@ -9,9 +9,10 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.FragmentTransaction
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
+import com.example.windyble.databinding.FragmentWindyListBinding
 
 import com.example.windyble.ui.WindybleFragment
-import kotlinx.android.synthetic.main.fragment_windy_list.*
+//import kotlinx.android.synthetic.main.fragment_windy_list.*
 
 
 /**
@@ -24,28 +25,30 @@ class WindyListFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-
     }
+
+    private var _binding: FragmentWindyListBinding? = null
+    private val binding get() = _binding!!
+
 
     override fun onCreateView(
             inflater: LayoutInflater, container: ViewGroup?,
             savedInstanceState: Bundle?
     ): View? {
-
-
         // TODO this currently only supports a single hive, to have multiple ie: more then one windyble
         //  this will require modification
 
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_windy_list, container, false)
+        _binding = FragmentWindyListBinding.inflate(inflater, container, false)
+//        return inflater.inflate(R.layout.fragment_windy_list, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         hiveAdapter = HiveAdapter(hives)
-        hives_list.adapter = hiveAdapter!!
+//        hives_list.adapter = hiveAdapter!!
+        binding.hivesList.adapter = hiveAdapter!!
 
         hiveAdapter?.hiveClicked = {
             val trans = parentFragmentManager.beginTransaction()

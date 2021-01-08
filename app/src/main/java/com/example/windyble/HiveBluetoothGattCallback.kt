@@ -32,10 +32,11 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
         }
     }
     var writeDescriptor:BluetoothGattDescriptor? = null
+    var propertiesDescriptor:BluetoothGattDescriptor? = null
 
-    fun writeProperty(msg:ByteArray){
+    fun writeProperty(msg:ByteArray):Boolean?{
         writeDescriptor?.value = msg
-        myGatt?.writeDescriptor(writeDescriptor)
+        return myGatt?.writeDescriptor(writeDescriptor)
     }
 
     var wait = false
@@ -141,7 +142,7 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
                                 val s = 0x9876.toShort() // Send connect bites
                                 val buffer = ByteBuffer.allocate(2)
                                 buffer.putShort(s)
-                                val ssss = "${host.address},${host.name}".encodeToByteArray()
+                                val ssss = "${host.name},${host.address}".encodeToByteArray()
                                 char.value = buffer.array()+ssss
 
                                 if (gatt.writeCharacteristic(char)){
@@ -161,7 +162,9 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
                             }
 
                             val cccd = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
                             for (desc in char.descriptors) {
+                                debug("<<<<<<<<< ${desc.uuid.toString()}")
                                 if(cccd.equals(desc.uuid)){
                                     notifyDescriptor = desc
                                     myGatt = gatt
@@ -172,6 +175,10 @@ class HiveBluetoothGattCallback(val host: Host): BluetoothGattCallback() {
                                     } else {
                                         debug("subscribe failed")
                                     }
+                                }
+                                else if(desc.uuid.toString().startsWith("00001237")){
+                                    // is properties descriptor
+                                    propertiesDescriptor = desc
                                 }
                             }
                         }

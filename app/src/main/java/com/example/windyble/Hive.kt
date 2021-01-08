@@ -17,12 +17,16 @@ import java.net.SocketException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
+import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.concurrent.thread
 
 typealias Peer = Pair<String, String>
 
 fun Peer.name() = this.first
 fun Peer.address() = this.second
+
+const val ACK_DURATION:Long = 30_000
 
 enum class PropertyType() {
     STRING,
@@ -93,12 +97,14 @@ class Hive() {
 
     var connectedChanged: ((Boolean) -> Unit)? = null
     var peersChanged: (() -> Unit)? = null
+    var lastAckTime:Long = System.currentTimeMillis()
 
 //    fun onConnectedChanged(f: (Boolean) -> Unit) {
 //        debug("<<<<< connected 2")
 //        connectedChanged = f
 //    }
 
+    @kotlinx.coroutines.ExperimentalCoroutinesApi
     suspend fun peerMessages(): Flow<String> {
         return flow {
             messageChanel.consumeEach {
@@ -107,12 +113,12 @@ class Hive() {
         }
     }
 
-
-    fun connect_bt(context: Context, address:String): Flow<PropType> {
+    @kotlinx.coroutines.ExperimentalCoroutinesApi
+    fun connect_bt(context: Context, address:String, myUUID:UUID): Flow<PropType> {
         val adapter = BluetoothAdapter.getDefaultAdapter();
         //"B8:27:EB:1F:38:F0"
-        val device = adapter.getRemoteDevice(address);
-        val host = Host(adapter!!.name, adapter!!.address)
+        val device = adapter.getRemoteDevice(address)
+        val host = Host(adapter!!.name, myUUID.toString())
         val gatt = HiveBluetoothGattCallback(host)
         gatt.onConnectedChanged {
             debug("<<<<< connected 1 $it")
@@ -219,6 +225,11 @@ class Hive() {
 
             }
             debug("processed");
+            // Send ack message
+            if(System.currentTimeMillis() - lastAckTime > ACK_DURATION) {
+                //write(ACK)
+                lastAckTime = System.currentTimeMillis()
+            }
 
 //            emit(msg)
         } else if (msgType == ACK) {
@@ -266,6 +277,10 @@ class Hive() {
                 connected = false
             }
         }
+    }
+
+    fun hangup():Boolean?{
+        return hiveGatt?.writeProperty("...".toByteArray())
     }
 
 
@@ -349,7 +364,7 @@ class Hive() {
         // Boolean values get handled here, no special logic required
         var msgVal = value
         try {
-            msgVal = msgVal.toString().toFloat() as Float
+            msgVal = msgVal.toString().toFloat()
             // If it's a whole number then send an long
             // can't use an == here, doesn't like that
             if (msgVal.rem(1) <= 0) {

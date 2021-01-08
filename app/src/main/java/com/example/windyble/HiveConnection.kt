@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.*
 import com.example.windyble.HiveWraper
 import com.example.windyble.debug
+import java.util.*
 
 /*
     Initialize with lifecycle.addObserver(this) within the main activity
@@ -14,18 +15,23 @@ class HiveConnection(application: Application) : AndroidViewModel(application), 
     val context = application
     lateinit var name:String
 
-    fun connect_bt(name:String, address:String){
+    fun connect_bt(name:String, address:String, myUUID:UUID){
         this.name = name
-        hiveWraper.setConnectTo(name, null, address, 0)
+        hiveWraper.setConnectTo(name, null, address, myUUID,0)
         debug("connect bt")
         resume()
     }
 
     fun connect(name:String, address:String, port:Int){
         this.name = name
-        hiveWraper.setConnectTo(name, address, null, port)
+        hiveWraper.setConnectTo(name, address, null, null, port)
         debug("connect")
         resume()
+    }
+
+    fun hangup():Boolean?
+    {
+        return hiveWraper.hangup()
     }
 
     @OnLifecycleEvent(Lifecycle.Event.ON_RESUME)

@@ -17,9 +17,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.windyble.databinding.AddHiveDiagBinding
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
-import kotlinx.android.synthetic.main.add_hive_diag.view.*
+//import kotlinx.android.synthetic.main.add_hive_diag.view.*
+import java.util.*
 
 
 const val WindyTAG = "Windyble <<"
@@ -83,7 +85,7 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             debug("Found Hive!! connecting...")
-                            hiveConnection.connect_bt("Phone", deviceHardwareAddress)
+                            hiveConnection.connect_bt("Phone", deviceHardwareAddress, get_uuid())
                             bt_scan_dialogue?.dismiss()
                         }else{
                             debug("already found it")
@@ -140,13 +142,29 @@ class MainActivity : AppCompatActivity() {
         receiver_registered = false
     }
 
+    private fun get_uuid(): UUID{
+        var uuid:String? = null
+        uuid = addrPrefs.getString("MY_BT_UUID", null)
+        if (uuid.isNullOrBlank()){
+            uuid = UUID.randomUUID().toString()
+            addrPrefs.edit().putString("MY_BT_UUID", uuid.toString())
+        }
+        return UUID.fromString(uuid)
+    }
+
     fun scan_bluetooth(search_name:String): BluetoothAdapter? {
         val prefs_key = "${search_name}_address"
+        // TODO remove this for production
+        if (true){
+            val mykey = "B8:27:EB:6D:A3:66"
+            hiveConnection.connect_bt("Phone", mykey, get_uuid())
+            bt_scan_dialogue?.dismiss()
+            return null
+        }
 
-        val prefs = applicationContext.getSharedPreferences(MyPREFERENCES, MODE_PRIVATE)
-        prefs.getString(prefs_key, null)?.let{
+        addrPrefs.getString(prefs_key, null)?.let{
             debug("..............................$it")
-            hiveConnection.connect_bt("Phone", it)
+            hiveConnection.connect_bt("Phone", it, get_uuid())
             bt_scan_dialogue?.dismiss()
             return null
         }
@@ -197,13 +215,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        debug("<<<<<<< PAUSE")
+        HiveBluetoothGattCallback.unsubscribe()
+        val hungup = hiveConnection.hangup()
+        debug("<<<<<<< hungup: $hungup")
+    }
+
     override fun onDestroy() {
-        super.onDestroy()
+
         if(receiver_registered) {
             unregisterReceiver(receiver)
         }
 
-        HiveBluetoothGattCallback.unsubscribe()
+        debug("<<<<<<< DESTROY")
+
+        super.onDestroy()
     }
 
     private fun addBlueHiveDialogue() {
@@ -223,22 +251,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addHiveDialogue() {
-        val view = layoutInflater.inflate(R.layout.add_hive_diag, null)
+//        val view = layoutInflater.inflate(R.layout.add_hive_diag, null)
+        val view = AddHiveDiagBinding.inflate(layoutInflater)
+
+
         val savedAddress = addrPrefs.getString(ADDRESS, "10.0.2.2")
-        view.input_address.setText(savedAddress)
+        view.inputAddress.setText(savedAddress)
 
         AlertDialog.Builder(this)
             .setTitle("Add Hive")
-            .setView(view)
+            .setView(view.root)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ ->
 
-                val addr = view.findViewById<TextInputEditText>(R.id.input_address).text.toString()
+                val addr = view.inputAddress.text.toString()
+                //view.findViewById<TextInputEditText>(R.id.input_address).text.toString()
                 if (addr != savedAddress) {
                     addrPrefs.edit().putString(ADDRESS, addr).apply()
                 }
-                val port =
-                    view.findViewById<TextInputEditText>(R.id.input_port).text.toString().toInt()
+                val port = view.inputPort.text.toString().toInt()
+//                    view.findViewById<TextInputEditText>(R.id.input_port).text.toString().toInt()
+
                 hiveConnection.connect("Windyble", addr, port)
                 debug("You clicked ok")
 

@@ -14,7 +14,10 @@ import com.example.windyble.R
 import com.example.windyble.debug
 import com.example.windyble.HiveConnection
 import com.example.windyble.HiveWraper
-import kotlinx.android.synthetic.main.windyble_fragment.*
+import com.example.windyble.databinding.FragmentWindyListBinding
+import com.example.windyble.databinding.WindybleFragmentBinding
+
+//import kotlinx.android.synthetic.main.windyble_fragment.*
 
 
 class POTListener(val wraper: HiveWraper):AdapterView.OnItemSelectedListener {
@@ -37,6 +40,10 @@ class POTListener(val wraper: HiveWraper):AdapterView.OnItemSelectedListener {
 
 class WindybleFragment : Fragment() {
 
+    private var _binding: WindybleFragmentBinding? = null
+    //FragmentWindyListBinding? = null
+    private val binding get() = _binding!!
+
     var reversed = false
     companion object {
         fun newInstance() = WindybleFragment()
@@ -52,17 +59,19 @@ class WindybleFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        return inflater.inflate(R.layout.windyble_fragment, container, false)
+        _binding = WindybleFragmentBinding.inflate(inflater, container, false)
+//        return inflater.inflate(R.layout.windyble_fragment, container, false)
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         hiveConnection = ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
 
-        initButton(up_button)
-        initButton(down_button)
+        initButton(binding.upButton)
+        initButton(binding.downButton)
 
-        val pot_spinner:Spinner = pot_spinner
+        val pot_spinner:Spinner = binding.potSpinner//pot_spinner
         pot_spinner.adapter = ArrayAdapter.createFromResource(
             requireContext(),
             R.array.pot_values,
@@ -74,8 +83,8 @@ class WindybleFragment : Fragment() {
 //            val speed = speed.text.toString().toInt()
 //            viewModel.hive.updateProperty("speed", speed)
 //        }
-        speed_seek.progress = 25
-        speed_seek.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+        binding.speedSeek.progress = 25
+        binding.speedSeek.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             override fun onProgressChanged(
                 seekBar: SeekBar,
                 progress: Int,
@@ -101,7 +110,7 @@ class WindybleFragment : Fragment() {
      */
     fun initButton(button: View){
         button.setOnTouchListener { arg0, arg1 ->
-            val isup = arg0 == up_button
+            val isup = arg0 == binding.upButton//up_button
             if (arg1.action == MotionEvent.ACTION_DOWN) {
                 button.isPressed = true
                 button.performClick()

@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.lifecycle.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
-
+import java.util.*
 
 
 // default address is to host that emulator is running on
@@ -13,6 +13,7 @@ class HiveWraper() {
     var hiveAddress: String? = null
     var hivePort: Int = 0
     var btAddress: String? = null
+    var mybtUUID:UUID? = null
 
     fun setConnectTo(
         hiveName: String = "Android Hive",
@@ -20,6 +21,7 @@ class HiveWraper() {
 //                     hiveAddress:String="192.168.5.41",
         hiveAddress: String? = null,
         btAddress: String? = null,
+        mybtUUID: UUID? = null,
         hivePort: Int = 3000
     ) {
 
@@ -27,6 +29,7 @@ class HiveWraper() {
         this.hiveAddress = hiveAddress
         this.hivePort = hivePort
         this.btAddress = btAddress
+        this.mybtUUID = mybtUUID
     }
 
     private val hive = Hive()
@@ -50,6 +53,9 @@ class HiveWraper() {
 
     fun updateProperty(prop_name: String, value: Any?) {
         hive.updateProperty(prop_name, value)
+    }
+    fun hangup():Boolean?{
+        return hive.hangup()
     }
 
     fun deleteProperty(name: String): Int {
@@ -91,7 +97,7 @@ class HiveWraper() {
                 }
                 if(!btAddress.isNullOrEmpty()){
                     // connect to bt address
-                    hive.connect_bt(context, btAddress!!).collect {
+                    hive.connect_bt(context, btAddress!!, mybtUUID!!).collect {
                         //debug("<<<< received $it")
                         withContext(Dispatchers.Main) {
                             propertyReceived.value = it

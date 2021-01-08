@@ -5,16 +5,23 @@ import android.view.View
 import android.view.ViewGroup
 
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.android.synthetic.main.hive_list_item.view.*
+import com.example.windyble.databinding.HiveListItemBinding
 
 class HiveAdapter(val hives:List<HiveWraper>): RecyclerView.Adapter<HiveAdapter.ViewHolder>() {
+
+    val binding:HiveListItemBinding
+        get() = _binding!!
+
+    private var _binding: HiveListItemBinding? = null
 
     var hiveClicked: ((HiveWraper)->Unit)? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): HiveAdapter.ViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.hive_list_item, parent, false)
-        return ViewHolder(view)
+//        val view = LayoutInflater.from(parent.context)
+//            .inflate(R.layout.hive_list_item, parent, false)
+        val inflator = LayoutInflater.from(parent.context)
+        _binding = HiveListItemBinding.inflate(inflator, parent, false)
+        return ViewHolder(binding)
     }
 
     override fun getItemCount(): Int {
@@ -31,8 +38,9 @@ class HiveAdapter(val hives:List<HiveWraper>): RecyclerView.Adapter<HiveAdapter.
 
     }
 
-    class ViewHolder(val view: View):RecyclerView.ViewHolder(view){
-        val name = view.hive_btn
+    class ViewHolder(val view: HiveListItemBinding):RecyclerView.ViewHolder(view.root){
+//        val b = binding
+        val name = view.hiveBtn
 
     }
 }
