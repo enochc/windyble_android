@@ -39,7 +39,6 @@ class WindyListFragment : Fragment() {
         //  this will require modification
 
         _binding = FragmentWindyListBinding.inflate(inflater, container, false)
-//        return inflater.inflate(R.layout.fragment_windy_list, container, false)
         return binding.root
     }
 
@@ -47,7 +46,6 @@ class WindyListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         hiveAdapter = HiveAdapter(hives)
-//        hives_list.adapter = hiveAdapter!!
         binding.hivesList.adapter = hiveAdapter!!
 
         hiveAdapter?.hiveClicked = {

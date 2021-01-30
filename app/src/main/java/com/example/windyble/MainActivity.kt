@@ -19,7 +19,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.windyble.databinding.AddHiveDiagBinding
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.android.material.textfield.TextInputEditText
 //import kotlinx.android.synthetic.main.add_hive_diag.view.*
 import java.util.*
 
@@ -45,7 +44,7 @@ const val PERIPHERAL_NAME = "Hive_Peripheral"
 class MainActivity : AppCompatActivity() {
 
     val hiveConnection: HiveConnection by viewModels()
-    var bluetoothAdapter: BluetoothAdapter? = null //BluetoothAdapter.getDefaultAdapter()
+    var bluetoothAdapter: BluetoothAdapter? = null
     lateinit var addrPrefs: SharedPreferences
     var bt_scan_dialogue:Dialog? = null
     var receiver_registered = false
@@ -85,7 +84,7 @@ class MainActivity : AppCompatActivity() {
                             }
 
                             debug("Found Hive!! connecting...")
-                            hiveConnection.connect_bt("Phone", deviceHardwareAddress, get_uuid())
+                            hiveConnection.connect_bt("Phone", deviceHardwareAddress, getUuid())
                             bt_scan_dialogue?.dismiss()
                         }else{
                             debug("already found it")
@@ -115,17 +114,17 @@ class MainActivity : AppCompatActivity() {
 
         val perm = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
         if (perm != PackageManager.PERMISSION_GRANTED) {
-            debug("Permission is not granted");
+            debug("Permission is not granted")
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
                 MY_PERMISSIONS_REQUEST_READ_CONTACTS_FINE
-            );
+            )
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
             != PackageManager.PERMISSION_GRANTED
         ) {
-            debug("Permission is not granted");
+            debug("Permission is not granted")
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION),
@@ -136,13 +135,13 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    fun stop_scan(adapter:BluetoothAdapter?){
+    private fun stopScan(adapter:BluetoothAdapter?){
         adapter?.cancelDiscovery()
         unregisterReceiver(receiver)
         receiver_registered = false
     }
 
-    private fun get_uuid(): UUID{
+    private fun getUuid(): UUID{
         var uuid:String? = addrPrefs.getString("MY_BT_UUID", null)
         if (uuid.isNullOrBlank()){
             uuid = UUID.randomUUID().toString()
@@ -151,19 +150,19 @@ class MainActivity : AppCompatActivity() {
         return UUID.fromString(uuid)
     }
 
-    fun scan_bluetooth(search_name:String): BluetoothAdapter? {
-        val prefs_key = "${search_name}_address"
+    private fun scanBluetooth(search_name:String): BluetoothAdapter? {
+        val prefsKey = "${search_name}_address"
         // TODO remove this for production
         if (true){
             val mykey = "B8:27:EB:6D:A3:66"
-            hiveConnection.connect_bt("Phone", mykey, get_uuid())
+            hiveConnection.connect_bt("Phone", mykey, getUuid())
             bt_scan_dialogue?.dismiss()
             return null
         }
 
-        addrPrefs.getString(prefs_key, null)?.let{
+        addrPrefs.getString(prefsKey, null)?.let{
             debug("..............................$it")
-            hiveConnection.connect_bt("Phone", it, get_uuid())
+            hiveConnection.connect_bt("Phone", it, getUuid())
             bt_scan_dialogue?.dismiss()
             return null
         }
@@ -236,12 +235,12 @@ class MainActivity : AppCompatActivity() {
     private fun addBlueHiveDialogue() {
         val view = layoutInflater.inflate(R.layout.add_blue_hive, null)
 
-        val adapter = scan_bluetooth(PERIPHERAL_NAME)?.let {
+        scanBluetooth(PERIPHERAL_NAME)?.let {
             bt_scan_dialogue = AlertDialog.Builder(this)
                 .setTitle("Add Bluetooth Hive")
                 .setView(view)
                 .setNegativeButton(android.R.string.cancel){_,_ ->
-                    stop_scan(it)
+                    stopScan(it)
                 }
                 .show()
         }

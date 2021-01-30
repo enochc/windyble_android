@@ -19,7 +19,6 @@ import java.nio.ByteOrder
 import java.nio.charset.Charset
 import java.util.*
 import kotlin.collections.ArrayList
-import kotlin.concurrent.thread
 
 typealias Peer = Pair<String, String>
 
@@ -154,7 +153,12 @@ class Hive() {
 
                 // send header with peer name then request peer updates
                 // TODO move request_peers into the header message
-                write("${HEADER}NAME=${name}")
+                // write raw hive hanshake reader
+                val hn = 0x66.toByte()
+                var byteArray = "HVEP\n".toByteArray()
+                byteArray += hn
+                byteArray += "${name}\n".toByteArray()
+                writeRaw(byteArray)
                 write(REQUEST_PEERS)
                 connected = true
             } catch (e: ConnectException) {
@@ -283,6 +287,15 @@ class Hive() {
         return hiveGatt?.writeProperty("...".toByteArray())
     }
 
+    private fun writeRaw(raw: ByteArray) {
+        runBlocking {
+            withContext(Dispatchers.IO) {
+                writer?.write(raw);
+                writer?.flush()
+                debug("written")
+            }
+        }
+    }
 
     private fun write(message: String) {
         if (connected) {
