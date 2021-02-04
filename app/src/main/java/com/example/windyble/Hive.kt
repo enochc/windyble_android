@@ -11,6 +11,7 @@ import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.io.OutputStream
+import java.lang.Error
 import java.net.ConnectException
 import java.net.Socket
 import java.net.SocketException
@@ -26,6 +27,8 @@ fun Peer.name() = this.first
 fun Peer.address() = this.second
 
 const val ACK_DURATION:Long = 30_000
+
+
 
 enum class PropertyType() {
     STRING,
@@ -130,10 +133,10 @@ class Hive() {
 
         GlobalScope.launch {
             for (msg in gatt.messageChanel){
-                val str = String(msg)//msg.toString()
-                debug("<<< got message via message channel from gatt: $str")
+//                val str = String(msg)//msg.toString()
+                debug("<<< got message via message channel from gatt: $msg")
                 runBlocking {
-                    process_msg(str)
+                    process_msg(msg)
                 }
 
             }
@@ -152,14 +155,13 @@ class Hive() {
                 writer = connection?.getOutputStream()
 
                 // send header with peer name then request peer updates
-                // TODO move request_peers into the header message
                 // write raw hive hanshake reader
                 val hn = 0x66.toByte()
                 var byteArray = "HVEP\n".toByteArray()
-                byteArray += hn
+                byteArray += H_NAME.toByte()
                 byteArray += "${name}\n".toByteArray()
                 writeRaw(byteArray)
-                write(REQUEST_PEERS)
+
                 connected = true
             } catch (e: ConnectException) {
                 hveDebug("Error: $e")
@@ -197,28 +199,46 @@ class Hive() {
         }
     }
 
-    private suspend fun process_msg(message:String){
-        val msgType = message.substring(0, 3)
-        val msg = message.substring(3)
+    private suspend fun process_msg(message:ByteArray){
+        val msgType = message[0]
+        val msg = message.sliceArray(1 until message.size);
 
         if (msgType == HEADER) {
-            //TODO maybe do something with this? the name of the server Hive
-            val name = msg.split("NAME=")[1]
-            debug("HEADER NAME: $name")
+            var pointer = 1
+            while (pointer < message.size){
+                var subhead = message[pointer]
+                var theRest = msg.sliceArray(1 until msg.size)
+                // TODO this can be expanded, currently only looks for the name header
+                when (subhead) {
+                    H_NAME -> {
+                        val name = String(theRest)
+                        debug("name =  $name")
+                        pointer += name.length
+                    }
+                    else -> {
+
+                        debug("nope.. $theRest")
+                        pointer ++
+                    }
+                }
+
+            }
         } else if (msgType == DELETE) { // delete message
 
             for ((i, p) in _properties.withIndex()) {
-                if (p.name == msg) {
+                val propName = String(msg)
+                if (p.name == propName) {
                     hveDebug("remove|| $msg")
                     _properties.removeAt(i)
                     val type = propertyToType(p.property.value)
-                    val prop = PropType(msg, Property(null), type, doRemove = i)
+                    val prop = PropType(propName, Property(null), type, doRemove = i)
                     propertyChannel.send(prop)
                     break
                 }
             }
         } else if (msgType == PROPERTY || msgType == PROPERTIES) {
-            val toml = Toml().read(msg)
+            val tomlStr = String(msg)
+            val toml = Toml().read(tomlStr)
             val es = toml.entrySet()
             debug("process properties: ${es.size}")
             for ((name, value) in es) {
@@ -228,6 +248,7 @@ class Hive() {
                 propertyChannel.send(prop)
 
             }
+
             debug("processed");
             // Send ack message
             if(System.currentTimeMillis() - lastAckTime > ACK_DURATION) {
@@ -236,19 +257,23 @@ class Hive() {
             }
 
 //            emit(msg)
-        } else if (msgType == ACK) {
-            debug("ACK RECEIVED")
-        } else if (msgType == REQUEST_PEERS) {
+        } else if (msgType == PONG) {
+            debug("PONG RECEIVED")
+        } else if (msgType == PEER_RESPONSE) {
             debug("<<<< RECEIVED PEERS $msg")
             _peers.clear()
-            for (p in msg.split(",").iterator()) {
-                val x = p.split("|")
-                _peers.add(Peer(x[0], x[1]))
-            }
+//            for (p in msg.split(",").iterator()) {
+//                val x = p.split("|")
+//                _peers.add(Peer(x[0], x[1]))
+//            }
+            debug("fix peer response")
+            throw Error("un implimented")
             peersChanged?.invoke()
         } else if (msgType == PEER_MESSAGE) {
             debug("Received Peer Message: $msg")
-            messageChanel.send(msg)
+            debug("fix peer message")
+            throw Error("un implimented")
+//            messageChanel.send(msg)
         } else {
             Log.e(javaClass.name, "ERROR: unknown message: $msg")
         }
@@ -265,14 +290,14 @@ class Hive() {
                 val msgBytes = ByteArray(size)
                 inputStream?.read(msgBytes)
 
-                var msg = msgBytes.toString(Charset.defaultCharset())
-                if (msg.isEmpty()) {
+                //var msg = msgBytes.toString(Charset.defaultCharset())
+                if (msgBytes.isEmpty()) {
                     // no data received is usually a sign that the socket has been disconnected
                     throw SocketException()
                 }
-                debug("data received: $msg")
+                debug("data received: $msgBytes")
 
-                process_msg(msg);
+                process_msg(msgBytes);
 
 
             } catch (e: SocketException) {
@@ -297,18 +322,18 @@ class Hive() {
         }
     }
 
-    private fun write(message: String) {
+    private fun write(message: ByteArray) {
         if (connected) {
             if (this.hiveGatt != null){
-                this.hiveGatt?.writeProperty(message.toByteArray())
+                this.hiveGatt?.writeProperty(message)
             } else {
                 runBlocking {
                     withContext(Dispatchers.IO) {
-                        val msgByts = (message).toByteArray(Charset.defaultCharset())
-                        val sBytes = intToByteArray(msgByts.size)
+//                        val msgByts = (message).toByteArray(Charset.defaultCharset())
+                        val sBytes = intToByteArray(message.size)
                         debug("<<<< writing: $message")
                         writer?.write(sBytes)
-                        writer?.write(msgByts)
+                        writer?.write(message)
                         writer?.flush()
                         debug("written")
                     }
@@ -318,7 +343,7 @@ class Hive() {
     }
 
     fun writeToPeer(peerName: String, msg: String) {
-        write("$PEER_MESSAGE$peerName$PEER_MESSAGE_DIV$msg")
+        write("$PEER_MESSAGE$peerName$PEER_MESSAGE_DIV$msg".toByteArray(Charsets.UTF_8))
     }
 
 //    @OptIn(kotlin.ExperimentalUnsignedTypes::class)
@@ -353,12 +378,24 @@ class Hive() {
     fun deleteProperty(name: String): Int {
         for ((i, p) in _properties.withIndex()) {
             if (p.name == name) {
-                write("$DELETE${p.name}")
+                val bytes = prepareMessage(DELETE, p.name);
+                write(bytes)
                 _properties.removeAt(i)
                 return i
             }
         }
         return -1
+    }
+
+    private fun prepareMessage(msgType:Byte, msg:String):ByteArray {
+        val msgBytes = msg.toByteArray(Charsets.UTF_8)
+        val bytes = ByteArray(msgBytes.size+1)
+        bytes[0] = msgType
+        for ((x, b) in msgBytes.withIndex()) {
+            bytes[x+1] = b
+        }
+        debug("<<<< PREP: ${String(bytes)}")
+        return bytes
     }
 
     private fun setOrAddProperty(pt: PropType) {
@@ -388,9 +425,10 @@ class Hive() {
                 msgVal = "\"${value}\""
             }
         }
+        val msg = "${prop_name}=$msgVal"
+        val bytes = prepareMessage(PROPERTY, msg)
 
-        val msg = "$PROPERTY${prop_name}=$msgVal"
-        write(msg)
+        write(bytes)
     }
 
     private fun getProperty(name: String): PropType? {
@@ -427,13 +465,26 @@ class Hive() {
     }
 
     companion object {
-        const val DELETE = "|d|"
-        const val HEADER = "|H|"
-        const val PROPERTIES = "|P|"
-        const val PROPERTY = "|p|"
+//        const val DELETE = "|d|"
+//        const val HEADER = "|H|"
+//        const val PROPERTIES = "|P|"
+//        const val PROPERTY = "|p|"
         const val REQUEST_PEERS = "<p|"
-        const val ACK = "<<|";
-        const val PEER_MESSAGE = "|s|"
+//        const val ACK = "<<|";
+//        const val PEER_MESSAGE = "|s|"
         const val PEER_MESSAGE_DIV = "|=|"
+
+        const val PEER_MESSAGE: Byte = 0x13;
+        const val PONG: Byte = 0x61;
+        const val HANGUP: Byte = 0x62;
+        const val PING: Byte = 0x63;
+
+        const val DELETE: Byte = 0x12
+        const val HEADER: Byte = 0x14
+        const val H_NAME: Byte = 0x67
+        const val PROPERTIES: Byte = 0x10
+        const val PROPERTY: Byte = 0x11
+        const val PEER_RESPONSE:Byte = 0x66
+        const val PEER_REQUEST:Byte = 0x65
     }
 }
