@@ -101,10 +101,6 @@ class Hive() {
     var peersChanged: (() -> Unit)? = null
     var lastAckTime:Long = System.currentTimeMillis()
 
-//    fun onConnectedChanged(f: (Boolean) -> Unit) {
-//        debug("<<<<< connected 2")
-//        connectedChanged = f
-//    }
 
     @kotlinx.coroutines.ExperimentalCoroutinesApi
     suspend fun peerMessages(): Flow<String> {
@@ -133,7 +129,6 @@ class Hive() {
 
         GlobalScope.launch {
             for (msg in gatt.messageChanel){
-//                val str = String(msg)//msg.toString()
                 debug("<<< got message via message channel from gatt: $msg")
                 runBlocking {
                     process_msg(msg)
@@ -154,11 +149,9 @@ class Hive() {
                 connection = Socket(address, port)
                 writer = connection?.getOutputStream()
 
-                // send header with peer name then request peer updates
-                // write raw hive hanshake reader
-                val hn = 0x66.toByte()
+                // send header with peer name
                 var byteArray = "HVEP\n".toByteArray()
-                byteArray += H_NAME.toByte()
+                byteArray += H_NAME
                 byteArray += "${name}\n".toByteArray()
                 writeRaw(byteArray)
 
@@ -323,9 +316,12 @@ class Hive() {
     }
 
     private fun write(message: ByteArray) {
+        debug("... wrighting!! ${this.hiveGatt}")
         if (connected) {
             if (this.hiveGatt != null){
-                this.hiveGatt?.writeProperty(message)
+
+                val wrote = this.hiveGatt?.writeProperty(message)
+                debug("Wrote to bluetooth GAT: $message, $wrote")
             } else {
                 runBlocking {
                     withContext(Dispatchers.IO) {
@@ -394,7 +390,7 @@ class Hive() {
         for ((x, b) in msgBytes.withIndex()) {
             bytes[x+1] = b
         }
-        debug("<<<< PREP: ${String(bytes)}")
+        debug("<<<< PREP ,, ${String(bytes)}")
         return bytes
     }
 
@@ -427,7 +423,7 @@ class Hive() {
         }
         val msg = "${prop_name}=$msgVal"
         val bytes = prepareMessage(PROPERTY, msg)
-
+        debug("Prepare to write message: $bytes")
         write(bytes)
     }
 

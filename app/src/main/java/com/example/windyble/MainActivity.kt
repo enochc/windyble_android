@@ -152,20 +152,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun scanBluetooth(search_name:String): BluetoothAdapter? {
         val prefsKey = "${search_name}_address"
+        debug("scan Bluetooth: $search_name")
         // TODO remove this for production
-        if (true){
-            val mykey = "B8:27:EB:6D:A3:66"
-            hiveConnection.connect_bt("Phone", mykey, getUuid())
-            bt_scan_dialogue?.dismiss()
-            return null
-        }
+//        if (true){
+//            val mykey = "B8:27:EB:6D:A3:66"
+//            hiveConnection.connect_bt("Phone", mykey, getUuid())
+//            bt_scan_dialogue?.dismiss()
+//            return null
+//        }
 
-        addrPrefs.getString(prefsKey, null)?.let{
-            debug("..............................$it")
-            hiveConnection.connect_bt("Phone", it, getUuid())
-            bt_scan_dialogue?.dismiss()
-            return null
-        }
+//        addrPrefs.getString(prefsKey, null)?.let{
+//            debug("..............................$it")
+//            hiveConnection.connect_bt("Phone", it, getUuid())
+//            bt_scan_dialogue?.dismiss()
+//            return null
+//        }
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
 
@@ -181,6 +182,7 @@ class MainActivity : AppCompatActivity() {
 
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         registerReceiver(receiver, filter)
+        debug("registered receiver")
         receiver_registered = true
 
         val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter?.bondedDevices
@@ -234,18 +236,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun addBlueHiveDialogue() {
         val view = layoutInflater.inflate(R.layout.add_blue_hive, null)
-
-        scanBluetooth(PERIPHERAL_NAME)?.let {
-            bt_scan_dialogue = AlertDialog.Builder(this)
-                .setTitle("Add Bluetooth Hive")
-                .setView(view)
-                .setNegativeButton(android.R.string.cancel){_,_ ->
-                    stopScan(it)
-                }
-                .show()
-        }
-
-
+        val bluetoothAdapter = scanBluetooth(PERIPHERAL_NAME)
+        bt_scan_dialogue = AlertDialog.Builder(this)
+            .setTitle("Add Bluetooth Hive")
+            .setView(view)
+            .setNegativeButton(android.R.string.cancel){_,_ ->
+                stopScan(bluetoothAdapter)
+            }
+            .show()
+        
     }
 
     private fun addHiveDialogue() {
