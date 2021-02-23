@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.util.Log
+import android.widget.HeaderViewListAdapter
 import com.moandjiezana.toml.Toml
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -21,13 +22,13 @@ import java.nio.charset.Charset
 import java.util.*
 import kotlin.collections.ArrayList
 
+
 typealias Peer = Pair<String, String>
 
 fun Peer.name() = this.first
 fun Peer.address() = this.second
 
 const val ACK_DURATION:Long = 30_000
-
 
 
 enum class PropertyType() {
@@ -141,6 +142,8 @@ class Hive() {
 
     }
 
+
+
     // TODO look at c
     suspend fun connect(address: String, port: Int, name:String="Android client"): Flow<PropType> {
         if (!connected && port > 0) {
@@ -151,15 +154,15 @@ class Hive() {
 
                 // send header with peer name
                 var byteArray = "HVEP\n".toByteArray()
-                byteArray += H_NAME
+                byteArray += HEADER_NAME
                 byteArray += "${name}\n".toByteArray()
                 writeRaw(byteArray)
 
                 connected = true
             } catch (e: ConnectException) {
-                hveDebug("Error: $e")
+                hveDebug("<<<<<<<<<<<<<<<<<<<<<<<<< Error: $e")
                 errorString = e.message
-                connected = false
+//                connected = false
             }
 
             hveDebug("Connected to server at $address on port $port")
@@ -194,7 +197,12 @@ class Hive() {
 
     private suspend fun process_msg(message:ByteArray){
         val msgType = message[0]
-        val msg = message.sliceArray(1 until message.size);
+        val msg = message.sliceArray(1 until message.size)
+        when (msgType) {
+            HEADER -> {
+                debug("||||||||| im a header!!")
+            }
+        }
 
         if (msgType == HEADER) {
             var pointer = 1
@@ -203,10 +211,10 @@ class Hive() {
                 var theRest = msg.sliceArray(1 until msg.size)
                 // TODO this can be expanded, currently only looks for the name header
                 when (subhead) {
-                    H_NAME -> {
+                    HEADER_NAME -> {
                         val name = String(theRest)
                         debug("name =  $name")
-                        pointer += name.length
+                        pointer += name.length+1
                     }
                     else -> {
 
@@ -268,7 +276,7 @@ class Hive() {
             throw Error("un implimented")
 //            messageChanel.send(msg)
         } else {
-            Log.e(javaClass.name, "ERROR: unknown message: $msg")
+            Log.e(javaClass.name, "ERROR: unknown message: $msgType: $msg")
         }
     }
 
@@ -301,8 +309,12 @@ class Hive() {
         }
     }
 
-    fun hangup():Boolean?{
-        return hiveGatt?.writeProperty("...".toByteArray())
+    fun hangup(){
+        val ba = ByteArray(1)
+        ba[0] = HANGUP
+//        return hiveGatt?.writeProperty(ba)
+        this.write(ba)
+        disconnect()
     }
 
     private fun writeRaw(raw: ByteArray) {
@@ -316,13 +328,14 @@ class Hive() {
     }
 
     private fun write(message: ByteArray) {
-        debug("... wrighting!! ${this.hiveGatt}")
+        debug("... wrighting!! $connected")
         if (connected) {
             if (this.hiveGatt != null){
 
                 val wrote = this.hiveGatt?.writeProperty(message)
                 debug("Wrote to bluetooth GAT: $message, $wrote")
             } else {
+                debug("...... send send send")
                 runBlocking {
                     withContext(Dispatchers.IO) {
 //                        val msgByts = (message).toByteArray(Charset.defaultCharset())
@@ -395,11 +408,13 @@ class Hive() {
     }
 
     private fun setOrAddProperty(pt: PropType) {
+        debug(" |||||||||||||||||||||||||||||||||||||||||||| $pt")
         val p = getProperty(pt.name)
         if (p != null) {
+            debug(".. set")
             p.property.set(pt.property)
         } else {
-
+            debug("... add ${pt.name} ${pt.property}")
             _properties.add(pt)
         }
     }
@@ -407,6 +422,7 @@ class Hive() {
     fun updateProperty(prop_name: String, value: Any?) {
         val p = getProperty(prop_name)
         p?.property?.set(Property(value))
+        debug("looking for $prop_name in $_properties :: $p")
         // Boolean values get handled here, no special logic required
         var msgVal = value
         try {
@@ -429,6 +445,7 @@ class Hive() {
 
     private fun getProperty(name: String): PropType? {
         for (p in _properties) {
+            debug("................................ im here ${p.name}")
             if (p.name == name) {
                 return p
             }
@@ -465,10 +482,10 @@ class Hive() {
 //        const val HEADER = "|H|"
 //        const val PROPERTIES = "|P|"
 //        const val PROPERTY = "|p|"
-        const val REQUEST_PEERS = "<p|"
+//        const val REQUEST_PEERS = "<p|"
 //        const val ACK = "<<|";
 //        const val PEER_MESSAGE = "|s|"
-        const val PEER_MESSAGE_DIV = "|=|"
+        const val PEER_MESSAGE_DIV = "\n"
 
         const val PEER_MESSAGE: Byte = 0x13;
         const val PONG: Byte = 0x61;
@@ -476,8 +493,8 @@ class Hive() {
         const val PING: Byte = 0x63;
 
         const val DELETE: Byte = 0x12
-        const val HEADER: Byte = 0x14
-        const val H_NAME: Byte = 0x67
+        const val HEADER: Byte = 0x72
+        const val HEADER_NAME: Byte = 0x78
         const val PROPERTIES: Byte = 0x10
         const val PROPERTY: Byte = 0x11
         const val PEER_RESPONSE:Byte = 0x66

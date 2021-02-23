@@ -15,16 +15,15 @@ class HiveWraper() {
     var btAddress: String? = null
     var mybtUUID:UUID? = null
 
-    fun setConnectTo(
+    //                    private val hiveAddress:String="10.0.2.2",
+    //                    hiveAddress:String="192.168.5.41",
+    constructor(
         hiveName: String = "Android Hive",
-//                    private val hiveAddress:String="10.0.2.2",
-//                     hiveAddress:String="192.168.5.41",
         hiveAddress: String? = null,
         btAddress: String? = null,
         mybtUUID: UUID? = null,
         hivePort: Int = 3000
-    ) {
-
+    ):this() {
         this.hiveName = hiveName
         this.hiveAddress = hiveAddress
         this.hivePort = hivePort
@@ -54,7 +53,7 @@ class HiveWraper() {
     fun updateProperty(prop_name: String, value: Any?) {
         hive.updateProperty(prop_name, value)
     }
-    fun hangup():Boolean?{
+    fun hangup(){
         return hive.hangup()
     }
 
@@ -107,7 +106,7 @@ class HiveWraper() {
                 if(!hiveAddress.isNullOrEmpty()){
                     hive.connect(hiveAddress!!, hivePort).collect {
 
-                        debug(" <<< ............ Connecting hive $hiveAddress : $hivePort")
+                        debug(" <<< ............ property: $hiveAddress : $hivePort, $it")
                         withContext(Dispatchers.Main) {
                             propertyReceived.value = it
 

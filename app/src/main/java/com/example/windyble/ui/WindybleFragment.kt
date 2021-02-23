@@ -38,16 +38,16 @@ class POTListener(val wraper: HiveWraper):AdapterView.OnItemSelectedListener {
     }
 }
 
-class WindybleFragment : Fragment() {
+class WindybleFragment(val hive:HiveWraper) : Fragment() {
 
     private var _binding: WindybleFragmentBinding? = null
     //FragmentWindyListBinding? = null
     private val binding get() = _binding!!
 
     var reversed = false
-    companion object {
-        fun newInstance() = WindybleFragment()
-    }
+//    companion object {
+//        fun newInstance() = WindybleFragment()
+//    }
 
     private lateinit var hiveConnection: HiveConnection
 
@@ -66,7 +66,7 @@ class WindybleFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        hiveConnection = ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
+//        hiveConnection = ViewModelProvider(requireActivity()).get(HiveConnection::class.java)
 
         initButton(binding.upButton)
         initButton(binding.downButton)
@@ -77,7 +77,7 @@ class WindybleFragment : Fragment() {
             R.array.pot_values,
             R.layout.pot_list_item
         )
-        pot_spinner.onItemSelectedListener = POTListener(hiveConnection.hiveWraper)
+        pot_spinner.onItemSelectedListener = POTListener(hive)
 
 //        speed_btn.setOnClickListener {
 //            val speed = speed.text.toString().toInt()
@@ -95,7 +95,7 @@ class WindybleFragment : Fragment() {
             override fun onStartTrackingTouch(seekBar: SeekBar) {}
             override fun onStopTrackingTouch(seekBar: SeekBar) {
                 debug("POSITION: ${seekBar.progress}")
-                hiveConnection.hiveWraper.updateProperty("speed", seekBar.progress)
+                hive.updateProperty("speed", seekBar.progress)
             }
         })
     }
@@ -116,15 +116,15 @@ class WindybleFragment : Fragment() {
                 button.performClick()
                 if((isup && !reversed) || (reversed && !isup)){
 //                if(isup){
-                    hiveConnection.hiveWraper.updateProperty("turn", 2)
+                    hive.updateProperty("turn", 2)
                 } else{
-                    hiveConnection.hiveWraper.updateProperty("turn", 3)
+                    hive.updateProperty("turn", 3)
                 }
 
 
             } else if(arg1.action == MotionEvent.ACTION_UP){
                 button.isPressed = false
-                hiveConnection.hiveWraper.updateProperty("turn", 0)
+                hive.updateProperty("turn", 0)
             }
 
             true
@@ -154,7 +154,7 @@ class WindybleFragment : Fragment() {
 //        speed.setText(speedval)
 
 
-        hiveConnection.hiveWraper.propertyReceived.observe(viewLifecycleOwner, Observer {
+        hive.propertyReceived.observe(viewLifecycleOwner, Observer {
             debug("<<<< <<< <<< GOT A PROPERTY: ${it.name}")
         })
 

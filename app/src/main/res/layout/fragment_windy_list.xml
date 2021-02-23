@@ -32,5 +32,34 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:context=".PropertyFragment"
         tools:listitem="@layout/hive_list_item" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        >
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_blue"
+            app:backgroundTint="@color/blue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/fab_margin"
+            app:srcCompat="@android:drawable/ic_input_add"
+            android:contentDescription="@string/add_bluetooth_connection"
+             />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/fab_margin"
+            app:srcCompat="@android:drawable/ic_input_add"
+            android:contentDescription="@string/add_tcp_connection"
+             />
+
+    </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

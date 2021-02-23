@@ -43,7 +43,7 @@ const val PERIPHERAL_NAME = "Hive_Peripheral"
 
 class MainActivity : AppCompatActivity() {
 
-    val hiveConnection: HiveConnection by viewModels()
+//    val hiveConnection: HiveConnection by viewModels()
     var bluetoothAdapter: BluetoothAdapter? = null
     lateinit var addrPrefs: SharedPreferences
     var bt_scan_dialogue:Dialog? = null
@@ -55,45 +55,46 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+// TODO bluetooth receiver stuff
 
-    val receiver = object : BroadcastReceiver() {
-        var found = false
-        override fun onReceive(context: Context, intent: Intent) {
-            val action: String = intent.action!!
-            debug("ACTION: $action")
-            when (action) {
-                BluetoothDevice.ACTION_FOUND -> {
-                    // Discovery has found a device. Get the BluetoothDevice
-                    // object and its info from the Intent.
-                    val device: BluetoothDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)!!
-                    val deviceName = device.name
-                    val deviceHardwareAddress = device.address // MAC address
-                    debug("<< Found device: $deviceName :: $deviceHardwareAddress")
-
-                    if (deviceName == PERIPHERAL_NAME ) {
-                        if(!found){
-                            found = true
-                            bluetoothAdapter?.cancelDiscovery()
-
-                            val prefs_key = "${deviceName}_address"
-
-                            with(applicationContext.getSharedPreferences(MyPREFERENCES, MODE_PRIVATE).edit()){
-                                debug("WRITE TO PREFS: $prefs_key = $deviceHardwareAddress")
-                                putString(prefs_key,deviceHardwareAddress)
-                                apply()
-                            }
-
-                            debug("Found Hive!! connecting...")
-                            hiveConnection.connect_bt("Phone", deviceHardwareAddress, getUuid())
-                            bt_scan_dialogue?.dismiss()
-                        }else{
-                            debug("already found it")
-                        }
-                    }
-                }
-            }
-        }
-    }
+//    val receiver = object : BroadcastReceiver() {
+//        var found = false
+//        override fun onReceive(context: Context, intent: Intent) {
+//            val action: String = intent.action!!
+//            debug("ACTION: $action")
+//            when (action) {
+//                BluetoothDevice.ACTION_FOUND -> {
+//                    // Discovery has found a device. Get the BluetoothDevice
+//                    // object and its info from the Intent.
+//                    val device: BluetoothDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)!!
+//                    val deviceName = device.name
+//                    val deviceHardwareAddress = device.address // MAC address
+//                    debug("<< Found device: $deviceName :: $deviceHardwareAddress")
+//
+//                    if (deviceName == PERIPHERAL_NAME ) {
+//                        if(!found){
+//                            found = true
+//                            bluetoothAdapter?.cancelDiscovery()
+//
+//                            val prefs_key = "${deviceName}_address"
+//
+//                            with(applicationContext.getSharedPreferences(MyPREFERENCES, MODE_PRIVATE).edit()){
+//                                debug("WRITE TO PREFS: $prefs_key = $deviceHardwareAddress")
+//                                putString(prefs_key,deviceHardwareAddress)
+//                                apply()
+//                            }
+//
+//                            debug("Found Hive!! connecting...")
+//                            hiveConnection.connect_bt("Phone", deviceHardwareAddress, getUuid())
+//                            bt_scan_dialogue?.dismiss()
+//                        }else{
+//                            debug("already found it")
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,14 +102,12 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(findViewById(R.id.toolbar))
 
         // Disconnect hive when activity is closed
-        lifecycle.addObserver(hiveConnection)
+//        lifecycle.addObserver(hiveConnection)
 
-        findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
-            addHiveDialogue()
-        }
-        findViewById<FloatingActionButton>(R.id.fab_blue).setOnClickListener { view ->
-            addBlueHiveDialogue()
-        }
+
+//        findViewById<FloatingActionButton>(R.id.fab_blue).setOnClickListener { view ->
+//            addBlueHiveDialogue()
+//        }
 
         addrPrefs = getSharedPreferences(MyPREFERENCES, MODE_PRIVATE)
 
@@ -137,7 +136,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopScan(adapter:BluetoothAdapter?){
         adapter?.cancelDiscovery()
-        unregisterReceiver(receiver)
+//        unregisterReceiver(receiver)
         receiver_registered = false
     }
 
@@ -181,7 +180,7 @@ class MainActivity : AppCompatActivity() {
 
 
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
-        registerReceiver(receiver, filter)
+//        registerReceiver(receiver, filter)
         debug("registered receiver")
         receiver_registered = true
 
@@ -219,14 +218,14 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         debug("<<<<<<< PAUSE")
         HiveBluetoothGattCallback.unsubscribe()
-        val hungup = hiveConnection.hangup()
-        debug("<<<<<<< hungup: $hungup")
+//        val hungup = hiveConnection.hangup()
+//        debug("<<<<<<< hungup: $hungup")
     }
 
     override fun onDestroy() {
 
         if(receiver_registered) {
-            unregisterReceiver(receiver)
+//            unregisterReceiver(receiver)
         }
 
         debug("<<<<<<< DESTROY")
@@ -244,35 +243,8 @@ class MainActivity : AppCompatActivity() {
                 stopScan(bluetoothAdapter)
             }
             .show()
-        
+
     }
 
-    private fun addHiveDialogue() {
-//        val view = layoutInflater.inflate(R.layout.add_hive_diag, null)
-        val view = AddHiveDiagBinding.inflate(layoutInflater)
 
-
-        val savedAddress = addrPrefs.getString(ADDRESS, "10.0.2.2")
-        view.inputAddress.setText(savedAddress)
-
-        AlertDialog.Builder(this)
-            .setTitle("Add Hive")
-            .setView(view.root)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-
-                val addr = view.inputAddress.text.toString()
-                //view.findViewById<TextInputEditText>(R.id.input_address).text.toString()
-                if (addr != savedAddress) {
-                    addrPrefs.edit().putString(ADDRESS, addr).apply()
-                }
-                val port = view.inputPort.text.toString().toInt()
-//                    view.findViewById<TextInputEditText>(R.id.input_port).text.toString().toInt()
-
-                hiveConnection.connect("Windyble", addr, port)
-                debug("You clicked ok")
-
-            }
-            .show()
-    }
 }
