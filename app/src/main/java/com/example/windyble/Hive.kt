@@ -1,24 +1,21 @@
 package com.example.windyble
 
+import android.R.attr.x
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.util.Log
-import android.widget.HeaderViewListAdapter
-import com.moandjiezana.toml.Toml
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.io.OutputStream
-import java.lang.Error
 import java.net.ConnectException
 import java.net.Socket
 import java.net.SocketException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.charset.Charset
 import java.util.*
 import kotlin.collections.ArrayList
 
@@ -49,8 +46,8 @@ fun propertyToType(p: Any?): PropertyType {
 
 class PropType(
     val name: String,
-    val property: Hive.Property,
-    private val type: PropertyType,
+    val property: Property,
+    val type: PropertyType,
     val doRemove: Int? = null
 ) {
     private fun isBool(): Boolean {
@@ -75,6 +72,7 @@ const val TAG = "Hive <<"
 fun hveDebug(s: String) = Log.d(TAG, s)
 
 
+@ExperimentalUnsignedTypes
 class Hive() {
 
     private var connection: Socket? = null
@@ -238,19 +236,9 @@ class Hive() {
                 }
             }
         } else if (msgType == PROPERTY || msgType == PROPERTIES) {
-            val tomlStr = String(msg)
-            val toml = Toml().read(tomlStr)
-            val es = toml.entrySet()
-            debug("process properties: ${es.size}")
-            for ((name, value) in es) {
-                debug("process:: $name, $value")
-                val type = propertyToType(value)
-                val prop = PropType(name, Property(value), type)
-                propertyChannel.send(prop)
+            val props = bytesToProperties(msg)
 
-            }
-
-            debug("processed");
+            debug("processed: $props");
             // Send ack message
             if(System.currentTimeMillis() - lastAckTime > ACK_DURATION) {
                 //write(ACK)
@@ -422,23 +410,8 @@ class Hive() {
     fun updateProperty(prop_name: String, value: Any?) {
         val p = getProperty(prop_name)
         p?.property?.set(Property(value))
-        debug("looking for $prop_name in $_properties :: $p")
-        // Boolean values get handled here, no special logic required
-        var msgVal = value
-        try {
-            msgVal = msgVal.toString().toFloat()
-            // If it's a whole number then send an long
-            // can't use an == here, doesn't like that
-            if (msgVal.rem(1) <= 0) {
-                msgVal = msgVal.toLong()
-            }
-        } catch (e: NumberFormatException) {
-            if (value is String) {
-                msgVal = "\"${value}\""
-            }
-        }
-        val msg = "${prop_name}=$msgVal"
-        val bytes = prepareMessage(PROPERTY, msg)
+        val bytes = propertyToBytes(prop_name, value)
+
         debug("Prepare to write message: $bytes")
         write(bytes)
     }
@@ -453,38 +426,7 @@ class Hive() {
         return null
     }
 
-
-    inner class Property(default: Any?) {
-
-        var onChanged: ArrayList<((Any?) -> Unit)> = arrayListOf()
-
-        var value = default
-            set(value) {
-                if (value != field) {
-                    field = value
-                    for (v in onChanged.iterator()) {
-                        v(value)
-                    }
-                }
-            }
-
-        fun set(other: Property) {
-            this.value = other.value
-        }
-
-        fun connect(fn: (Any?) -> Unit) {
-            onChanged.add(fn)
-        }
-    }
-
     companion object {
-//        const val DELETE = "|d|"
-//        const val HEADER = "|H|"
-//        const val PROPERTIES = "|P|"
-//        const val PROPERTY = "|p|"
-//        const val REQUEST_PEERS = "<p|"
-//        const val ACK = "<<|";
-//        const val PEER_MESSAGE = "|s|"
         const val PEER_MESSAGE_DIV = "\n"
 
         const val PEER_MESSAGE: Byte = 0x13;
@@ -499,5 +441,135 @@ class Hive() {
         const val PROPERTY: Byte = 0x11
         const val PEER_RESPONSE:Byte = 0x66
         const val PEER_REQUEST:Byte = 0x65
+
+        const val IS_STR: Byte = 0x20
+        const val IS_BOOL: Byte = 0x19
+        const val IS_SHORT: Byte = 0x21 // 8 bits
+        const val IS_SMALL: Byte = 0x14 // 16 bits
+        const val IS_NONE: Byte = 0x18;
+
+        // todo there is more to be done here!!
+        fun propertyToBytes(prop_name: String, value: Any?):ByteArray {
+            val bytes = ArrayList<Byte>()
+            bytes.add(PROPERTY)
+            bytes.add(prop_name.length.toUByte().toByte())
+            bytes.addAll(prop_name.encodeToByteArray().asList())
+            when (value) {
+                is String -> {
+                    val strVal = value.toString()
+                    bytes.add(IS_STR)
+                    bytes.addAll(strVal.encodeToByteArray().asList())
+                }
+                is Byte -> {
+                    bytes.add(IS_SHORT)
+                    bytes.add(value.toByte())
+                }
+                is Int -> {
+                    if (value > Byte.MIN_VALUE && value < Byte.MAX_VALUE)  {
+                        bytes.add(IS_SHORT)
+                        bytes.add(value.toByte())
+                    } else if(value> Short.MIN_VALUE && value <Short.MAX_VALUE){
+                        bytes.add(IS_SMALL)
+                        val arr = byteArrayOf(
+                            (value shr 8 and 0xFF).toByte(),
+                            (value and 0xFF).toByte()
+                        )
+                        bytes.addAll(arr.toList())
+                    }
+                }
+                is Short -> {
+                    bytes.add(IS_SMALL)
+                    val num = value as Int
+                    val arr = byteArrayOf(
+                        (num shr 8 and 0xFF).toByte(),
+                        (num and 0xFF).toByte()
+                    )
+                    bytes.addAll(arr.toList())
+                }
+                else -> {
+                    bytes.add(IS_NONE)
+                }
+            }
+            return bytes.toByteArray()
+        }
+
+        fun bytesToProperties(bytes:ByteArray):ArrayList<PropType> {
+            val props = ArrayList<PropType>()
+            var currentPos = 0;
+
+            while (currentPos < bytes.size) {
+                val s = bytes[currentPos].toUByte().toInt()
+                val name_end = currentPos + s
+                debug(".. <<<<<<<<: size: ${bytes.size}, pos: $currentPos, until: $name_end, ${bytes.slice(currentPos..name_end)}")
+                val name = String(bytes.sliceArray(currentPos..name_end))
+                debug("p_name: $name")
+                currentPos = name_end +1
+                val pType = bytes[currentPos]
+
+                currentPos += 1
+
+                when(pType) {
+                    IS_STR -> {
+                        val strLength = bytes[currentPos].toUInt().toInt()
+                        val strVal = String(bytes.sliceArray(s+3..(s+3+strLength)))
+                        debug(".... string $strVal")
+                        props.add(PropType(name, Property(strVal), PropertyType.STRING))
+                        currentPos += strLength
+                    }
+                    IS_BOOL -> {
+                        val b = bytes[currentPos].toInt() > 0
+                        debug("... bool: $b")
+                        props.add(PropType(name, Property(b), PropertyType.BOOL))
+                        currentPos += 1
+                    }
+                    IS_SHORT -> { // 8 bit
+                        val b = bytes[currentPos].toInt()
+                        debug("... short: $b")
+                        props.add(PropType(name, Property(b), PropertyType.NUM))
+                        currentPos += 1
+                    }
+                    IS_SMALL -> {
+                        // 16 bits, kotlin doesn't have a Small, a Short is 16 bits
+                        // 8 bits is just called a Byte
+                        val bb = ByteBuffer.allocate(2)
+                        bb.order(ByteOrder.BIG_ENDIAN)
+                        bb.put(bytes[currentPos])
+                        bb.put(bytes[currentPos+1])
+                        val shortVal = bb.getShort(0)
+                        debug("short= $shortVal, ${bytes.slice(currentPos..currentPos+1)}")
+                        props.add(PropType(name, Property(shortVal), PropertyType.NUM))
+                        currentPos += 2
+                    }
+                    else -> {
+                        debug("<<<<<< something else:: $pType")
+                        props.add(PropType(name, Property(null), PropertyType.NONE))
+                    }
+                }
+            }
+            return props
+        }
+    }
+}
+
+class Property(default: Any?) {
+
+    var onChanged: ArrayList<((Any?) -> Unit)> = arrayListOf()
+
+    var value = default
+        set(value) {
+            if (value != field) {
+                field = value
+                for (v in onChanged.iterator()) {
+                    v(value)
+                }
+            }
+        }
+
+    fun set(other: Property) {
+        this.value = other.value
+    }
+
+    fun connect(fn: (Any?) -> Unit) {
+        onChanged.add(fn)
     }
 }

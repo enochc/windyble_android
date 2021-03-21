@@ -57,7 +57,7 @@ class HiveAdapter(val hives:ArrayList<HiveWraper>, val context: Context, val sco
             holder.view.connected = if (it) ConnectionStatus.Connected else ConnectionStatus.NotConnected
         })
 
-        holder.view.connected = ConnectionStatus.NotConnected
+        holder.view.connected = if (hive.connected.value == true) ConnectionStatus.Connected else ConnectionStatus.NotConnected
         holder.view.connectBtn.setOnClickListener {
             AlertDialog.Builder(context)
                 .setTitle("Confirm to run Hive?")
